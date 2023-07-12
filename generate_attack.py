@@ -25,7 +25,7 @@ parser.add_argument("--nb_iter", default=10, type=int, help="number of iteration
 parser.add_argument("--block_size", default=512, type=int, help="block size of B-NTGA")
 parser.add_argument("--batch_size", default=30, type=int, help="batch size")
 parser.add_argument("--save_path", default="", type=str, help="path to save poisoned data")
-parser.add_argument("--cuda_visible_devices", default="0", type=str, help="specify which GPU to run \
+parser.add_argument("--cuda_visible_devices", default="1", type=str, help="specify which GPU to run \
                     an application on")
 
 args = parser.parse_args()
