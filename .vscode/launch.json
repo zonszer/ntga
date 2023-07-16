@@ -1,0 +1,60 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "generate_attack.py",
+        "type": "python",
+        "request": "launch",
+        "python": "python",
+        "args": [
+            "--model_type=fnn",
+            "--dataset=cifar10",
+            "--save_path=./data/",
+        ],      
+        "program": "generate_attack.py",
+        "justMyCode": false,
+        "console": "integratedTerminal",
+        "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
+      },
+      
+      {
+        "name": "poison.py-P_NT1",
+        "type": "python",
+        "request": "launch",
+        "python": "python",
+        "args": [
+            "--id=debug_PGD",
+            "--poison_type=NT_fromNormalModel",
+        ],      
+        "program": "poison.py",
+        "console": "integratedTerminal",
+        "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
+      },
+      {
+        "name": "test_onebatch",   
+        "type": "python",
+        "request": "launch",
+        "python": "python",
+        "args": [
+          "--id=test_onebatch",
+          "--data_path=data/OER-Summary-LZ-1iters.xlsx",
+          "--model=Mass-activity-at-1.43V+slope-relative-to-Ru",
+          "--PCA_dim_select_method=assigned",
+          "--num_restarts=15",
+          "--PCA_dim=18",
+          "--ker_lengthscale_upper=10",
+          "--bs=1024",
+          "--q_num=7",
+          "--mc_samples_num=1024",
+          "--data_search_space=data/SearchSpace_3elems_Ru0.9.pkl",
+          "--use_y_norm",
+          "--is_MOBO",
+          "--use_MI_filter",
+          "--use_Xnorm_afterPCA",
+        ],      
+        "program": "PCE_analysis.py",
+        "console": "integratedTerminal",
+        "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
+      }
+    ]
+  }

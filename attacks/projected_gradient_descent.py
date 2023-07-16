@@ -72,18 +72,18 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
         eta = np.zeros_like(x)
 
     # Clip eta
-    eta = clip_eta(eta, norm, eps)
+    eta = clip_eta(eta, norm, eps)  #eta is the perturbation
     adv_x = x + eta
     if clip_min is not None or clip_max is not None:
         adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         
-    for i in range(nb_iter):
+    for i in range(nb_iter):    #10 iterations for 1 batch 520 images
         adv_x = fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t, loss, 
                                      fx_train_0, fx_test_0, eps, norm, clip_min, clip_max, targeted, batch_size)
 
         # Clipping perturbation eta to norm norm ball
         eta = adv_x - x
-        eta = clip_eta(eta, norm, eps)
+        eta = clip_eta(eta, norm, eps)  #先adv_x=eta + X, 后clip adv_x，再clip eta, 最终得到adv_x
         adv_x = x + eta
 
         # Redo the clipping.

@@ -52,7 +52,7 @@ elif args.dataset == "imagenet":
     print("For ImageNet, please specify the file path manually.")
 else:
     raise ValueError("To load custom dataset, please modify the code directly.")
-eps_iter = (args.eps/args.nb_iter)*1.1
+eps_iter = (args.eps/args.nb_iter)*1.1  #!
 
 seed = 0
     
@@ -70,7 +70,7 @@ def surrogate_fn(model_type, W_std, b_std, num_classes):
                     which computes the kernel matrix
     """
     if model_type == "fnn":
-        init_fn, apply_fn, kernel_fn = stax.serial(DenseGroup(5, 512, W_std, b_std))
+        init_fn, apply_fn, kernel_fn = stax.serial(DenseGroup(5, 512, W_std, b_std))    #n is num of layers, 512 is Number of neurons
     elif model_type == "cnn":
         if args.dataset == 'imagenet':
             init_fn, apply_fn, kernel_fn = stax.serial(ConvGroup(2, 64, (3, 3), W_std, b_std),
@@ -110,12 +110,12 @@ def model_fn(kernel_fn, x_train=None, x_test=None, fx_train_0=0., fx_test_0=0., 
     :return: a np.ndarray for the model logits.
     """
     # Kernel
-    ntk_train_train = kernel_fn(x_train, x_train, 'ntk')
-    ntk_test_train = kernel_fn(x_test, x_train, 'ntk')
-    
+    ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #x_train.shape=(512, 3072)
+    ntk_test_train = kernel_fn(x_test, x_train, 'ntk')  #what is the meaning of test_train here? x_test.shape=(10000, 3072)
+    ##ntk_train_train.shape=(512, 512), ntk_test_train.shape=(10000, 512)
     # Prediction
     predict_fn = nt.predict.gradient_descent_mse(ntk_train_train, y_train, diag_reg=diag_reg)
-    return predict_fn(t, fx_train_0, fx_test_0, ntk_test_train)
+    return predict_fn(t, fx_train_0, fx_test_0, ntk_test_train) #fx_test_0=0， t=none
 
 def adv_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='mse', t=None, targeted=False, diag_reg=1e-4):
     """
@@ -143,7 +143,7 @@ def adv_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='mse', t=None, ta
     :return: a float for loss.
     """
     # Kernel
-    ntk_train_train = kernel_fn(x_train, x_train, 'ntk')
+    ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #??
     ntk_test_train = kernel_fn(x_test, x_train, 'ntk')
     
     # Prediction
@@ -165,8 +165,8 @@ def main():
     # For ImageNet, please specify the file path manually
     print("Loading dataset...")
     x_train_all, y_train_all, x_test, y_test = tuple(np.array(x) for x in get_dataset(args.dataset, None, None, flatten=flatten))
-    x_train_all, y_train_all = shaffle(x_train_all, y_train_all, seed)
-    x_train, x_val = x_train_all[:train_size], x_train_all[train_size:train_size+args.val_size]
+    x_train_all, y_train_all = shaffle(x_train_all, y_train_all, seed)  #x_train_all is (50000, 3072), y_train_all is (50000, 10)
+    x_train, x_val = x_train_all[:train_size], x_train_all[train_size:train_size+args.val_size] 
     y_train, y_val = y_train_all[:train_size], y_train_all[train_size:train_size+args.val_size]
     
     # Build model
@@ -175,7 +175,7 @@ def main():
     b_std, W_std = np.sqrt(0.18), np.sqrt(1.76) # Standard deviation of initial biases and weights
     init_fn, apply_fn, kernel_fn = surrogate_fn(args.model_type, W_std, b_std, num_classes)
     apply_fn = jit(apply_fn)
-    kernel_fn = jit(kernel_fn, static_argnums=(2,))
+    kernel_fn = jit(kernel_fn, static_argnums=(2,)) #static_argnums is kernel_fn(x1, x2, 'nngp')
     
     # grads_fn: a callable that takes an input tensor and a loss function, 
     # and returns the gradient w.r.t. an input tensor.
@@ -183,7 +183,7 @@ def main():
     
     # Generate Neural Tangent Generalization Attacks (NTGA)
     print("Generating NTGA....")
-    epoch = int(x_train.shape[0]/args.block_size)
+    epoch = int(x_train.shape[0]/args.block_size)   #what is block_size? maybe similar to batch_size
     x_train_adv = []
     y_train_adv = []
     for idx in tqdm(range(epoch)):

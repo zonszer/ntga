@@ -105,7 +105,7 @@ def get_dataset(name, n_train=None, n_test=None, permute_train=False, flatten=Fa
     ds_train, ds_test = tfds.as_numpy(
         tfds.load(
             name + ':3.*.*',
-            split=['train' + ('[:%d]' % n_train if n_train is not None else ''),
+            split=['train' + ('[:%d]' % n_train if n_train is not None else ''),    #'[:%d]' % n_train 控制str
                    'test' + ('[:%d]' % n_test if n_test is not None else '')],
             batch_size=-1,
             as_dataset_kwargs={'shuffle_files': False}))

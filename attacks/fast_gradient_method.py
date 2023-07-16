@@ -64,17 +64,17 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
                                loss,
                                t,
                                targeted)
-        grads += batch_grads
+        grads += batch_grads    #!cumulative sum
 
     axis = list(range(1, len(grads.shape)))
     avoid_zero_div = 1e-12
     if norm == np.inf:
-        perturbation = eps * np.sign(grads)
+        perturbation = eps * np.sign(grads) #perturbation.shape = (512, 3072)
     elif norm == 1:
         raise NotImplementedError("L_1 norm has not been implemented yet.")
     elif norm == 2:
         square = np.maximum(avoid_zero_div, np.sum(np.square(grads), axis=axis, keepdims=True))
-        perturbation = grads / np.sqrt(square)
+        perturbation = grads / np.sqrt(square)  #！
     
     adv_x = x + perturbation
     
