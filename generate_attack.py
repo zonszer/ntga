@@ -15,7 +15,7 @@ from utils_jax import *
 from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description="Generate NTGA attack!")
-parser.add_argument("--model_type", default="fnn", type=str, help="surrogate model. Choose either `fnn` or `cnn`")
+parser.add_argument("--model_type", default="cnn", type=str, help="surrogate model. Choose either `fnn` or `cnn`")
 parser.add_argument("--dataset", required=True, type=str, help="dataset. `mnist`, `cifar10`, and `imagenet`\
                     are available. For ImageNet or other dataset, please modify the path in the code directly.")
 parser.add_argument("--val_size", default=10000, type=int, help="size of validation data")
@@ -23,9 +23,9 @@ parser.add_argument("--t", default=64, type=int, help="time step used to compute
 parser.add_argument("--eps", type=float, help="epsilon. Strength of NTGA")
 parser.add_argument("--nb_iter", default=10, type=int, help="number of iteration used to generate poisoned data")
 parser.add_argument("--block_size", default=512, type=int, help="block size of B-NTGA")
-parser.add_argument("--batch_size", default=30, type=int, help="batch size")
+parser.add_argument("--batch_size", default=30, type=int, help="batch size, refer to batch sie of test set when making posion data")
 parser.add_argument("--save_path", default="", type=str, help="path to save poisoned data")
-parser.add_argument("--cuda_visible_devices", default="1", type=str, help="specify which GPU to run \
+parser.add_argument("--cuda_visible_devices", default="2", type=str, help="specify which GPU to run \
                     an application on")
 
 args = parser.parse_args()
@@ -143,20 +143,20 @@ def adv_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='mse', t=None, ta
     :return: a float for loss.
     """
     # Kernel
-    ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #??
-    ntk_test_train = kernel_fn(x_test, x_train, 'ntk')
+    ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #out shape:(512, 512)
+    ntk_test_train = kernel_fn(x_test, x_train, 'ntk')      #shape=(30, 512)
     
-    # Prediction
-    predict_fn = nt.predict.gradient_descent_mse(ntk_train_train, y_train, diag_reg=diag_reg)
-    fx = predict_fn(t, 0., 0., ntk_test_train)[1]
-    
+    # Prediction    #why not use gradient_descent_mse_ensemble?
+    predict_fn = nt.predict.gradient_descent_mse(ntk_train_train, y_train, diag_reg=diag_reg)   #need change here
+    fx = predict_fn(t, 0., 0., ntk_test_train)[1]       #t is time when poision occurs, also equals time step used to compute poisoned data
+    # what zero means? A:  predict_fn(t, fx_train_0, fx_test_0, k_test_train)
     # Loss
     if loss == 'cross-entropy':
-        loss = cross_entropy_loss(fx, y_test)
+        loss = cross_entropy_loss(fx, y_test)   #fx is predicted logits, y_test.shape=(30, 10), fx.shape=(30, 10)
     elif loss == 'mse':
         loss = mse_loss(fx, y_test)
         
-    if targeted:
+    if targeted:    # targeted =Faalse by default
         loss = -loss        
     return loss
     

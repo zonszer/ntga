@@ -57,14 +57,14 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
     grads = 0
     for i in range(int(len(x_test)/batch_size)):
         batch_grads = grads_fn(x_train, 
-                               x_test[batch_size*i:batch_size*(i+1)], 
+                               x_test[batch_size*i:batch_size*(i+1)], #why X_test.shape != X_train.shape?
                                y_train, 
                                y_test[batch_size*i:batch_size*(i+1)], 
                                kernel_fn, 
                                loss,
-                               t,
-                               targeted)
-        grads += batch_grads    #!cumulative sum
+                               t,   #!t is used to compute poisoned data
+                               targeted)    #主要还是不知道它grad ascent是咋实现？A: +grad 为ascent, -grad为descent
+        grads += batch_grads    #!cumulative sum of all batches in test set
 
     axis = list(range(1, len(grads.shape)))
     avoid_zero_div = 1e-12
@@ -76,7 +76,7 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
         square = np.maximum(avoid_zero_div, np.sum(np.square(grads), axis=axis, keepdims=True))
         perturbation = grads / np.sqrt(square)  #！
     
-    adv_x = x + perturbation
+    adv_x = x + perturbation    
     
     # If clipping is needed, reset all values outside of [clip_min, clip_max]
     if (clip_min is not None) or (clip_max is not None):

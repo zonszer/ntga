@@ -72,12 +72,12 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
         eta = np.zeros_like(x)
 
     # Clip eta
-    eta = clip_eta(eta, norm, eps)  #eta is the perturbation
+    eta = clip_eta(eta, norm, eps)  #eta is the (η), means perturbation of 1 iter?
     adv_x = x + eta
     if clip_min is not None or clip_max is not None:
         adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         
-    for i in range(nb_iter):    #10 iterations for 1 batch 520 images
+    for i in range(nb_iter):    #10 iterations for 1 batch which composed of 520 images
         adv_x = fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t, loss, 
                                      fx_train_0, fx_test_0, eps, norm, clip_min, clip_max, targeted, batch_size)
 
