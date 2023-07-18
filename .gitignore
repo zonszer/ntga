@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+terminal_orders_NTGA.txt
 
 # C extensions
 *.so
