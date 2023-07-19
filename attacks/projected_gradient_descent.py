@@ -1,7 +1,7 @@
 import jax.numpy as np
 from attacks.utils import clip_eta, one_hot
 from attacks.fast_gradient_method import fast_gradient_method
-
+import torch
 
 def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t=None, 
                                loss='cross-entropy', fx_train_0=0., fx_test_0=0., eps=0.3, eps_iter=0.03, 
@@ -59,10 +59,9 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
         raise ValueError("Norm order must be either np.inf or 2.")
         
     x = x_train
-    if y_test is None:
-        # Using model predictions as ground truth to avoid label leaking
-        x_labels = np.argmax(model_fn(kernel_fn, x_train, x_test, fx_train_0, fx_test_0)[1], 1)
-        y_test = one_hot(x_labels, num_classes)
+
+        # x_labels = np.argmax(model_fn(kernel_fn, x_train, x_test, fx_train_0, fx_test_0)[1], 1)
+        # y_test = one_hot(x_labels, num_classes)
         
     # Initialize loop variables
     if rand_init:
@@ -77,7 +76,7 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
     if clip_min is not None or clip_max is not None:
         adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         
-    for i in range(nb_iter):    #10 iterations for 1 batch which composed of 520 images
+    for i in range(nb_iter):    #10 iterations for 1 batch which composed of 520 images #Q: 10iter的意义是什么？
         adv_x = fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t, loss, 
                                      fx_train_0, fx_test_0, eps, norm, clip_min, clip_max, targeted, batch_size)
 

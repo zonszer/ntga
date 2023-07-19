@@ -160,14 +160,34 @@ def adv_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='mse', t=None, ta
         loss = -loss        
     return loss
     
+def NT_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='KL', t=None, targeted=True, diag_reg=1e-4, T=4.0):
+    # Kernel
+    ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #out shape:(512, 512)
+    ntk_test_train = kernel_fn(x_test, x_train, 'ntk')      #shape=(30, 512)
+    
+    # Prediction    #why not use gradient_descent_mse_ensemble?
+    predict_fn = nt.predict.gradient_descent_mse(ntk_train_train, y_train, diag_reg=diag_reg)   #need change here
+    fx = predict_fn(t, 0., 0., ntk_test_train)[1]       #t is time when poision occurs, also equals time step used to compute poisoned data
+    # what zero means? A:  predict_fn(t, fx_train_0, fx_test_0, k_test_train)
+
+    if loss=='KL':
+        loss = kl_divergence_loss_with_temperature(fx, y_test, T)
+    elif loss == 'cross-entropy':
+        loss = cross_entropy_loss(fx, y_test)   #fx is predicted logits, y_test.shape=(30, 10), fx.shape=(30, 10)
+    elif loss == 'mse':
+        loss = mse_loss(fx, y_test)
+   
+    return -loss    #always targeted
+
+
 def main():
     # Prepare dataset
     # For ImageNet, please specify the file path manually
     print("Loading dataset...")
     x_train_all, y_train_all, x_test, y_test = tuple(np.array(x) for x in get_dataset(args.dataset, None, None, flatten=flatten))
     x_train_all, y_train_all = shaffle(x_train_all, y_train_all, seed)  #x_train_all is (50000, 3072), y_train_all is (50000, 10)
-    x_train, x_val = x_train_all[:train_size], x_train_all[train_size:train_size+args.val_size] 
-    y_train, y_val = y_train_all[:train_size], y_train_all[train_size:train_size+args.val_size]
+    x_train, x_val = x_train_all[:train_size], x_train_all[:train_size].copy()  #TODO: maybe can delete copy()
+    y_train, y_val = y_train_all[:train_size], None
     
     # Build model
     print("Building model...")
@@ -179,7 +199,7 @@ def main():
     
     # grads_fn: a callable that takes an input tensor and a loss function, 
     # and returns the gradient w.r.t. an input tensor.
-    grads_fn = jit(grad(adv_loss, argnums=0), static_argnums=(4, 5, 7))
+    grads_fn = jit(grad(NT_loss, argnums=0), static_argnums=(4, 5, 7))
     
     # Generate Neural Tangent Generalization Attacks (NTGA)
     print("Generating NTGA....")
@@ -189,9 +209,10 @@ def main():
     for idx in tqdm(range(epoch)):
         _x_train = x_train[idx*args.block_size:(idx+1)*args.block_size]
         _y_train = y_train[idx*args.block_size:(idx+1)*args.block_size]
+        _x_test = x_test[idx*args.block_size:(idx+1)*args.block_size]
         _x_train_adv = projected_gradient_descent(model_fn=model_fn, kernel_fn=kernel_fn, grads_fn=grads_fn, 
-                                                  x_train=_x_train, y_train=_y_train, x_test=x_val, y_test=y_val, 
-                                                  t=args.t, loss='cross-entropy', eps=args.eps, eps_iter=eps_iter, 
+                                                  x_train=_x_train, y_train=_y_train, x_test=_x_test, y_test=y_val, 
+                                                  t=args.t, loss='KL', eps=args.eps, eps_iter=eps_iter, 
                                                   nb_iter=args.nb_iter, clip_min=0, clip_max=1, batch_size=args.batch_size)
 
         x_train_adv.append(_x_train_adv)

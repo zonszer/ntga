@@ -10,12 +10,32 @@
             "--model_type=fnn",
             "--dataset=cifar10",
             "--save_path=./data/",
+          "--cuda_visible_devices=2",
         ],      
         "program": "generate_attack.py",
         "justMyCode": false,
         "console": "integratedTerminal",
         "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
       },
+      {
+        "name": "evaluate.py",
+        "type": "python",
+        "request": "launch",
+        "python": "python",
+        "args": [
+         "--model_type=resnet18",
+          "--dataset=cifar10",
+          "--dtype=Clean",
+         "--batch_size=128", 
+          "--save_path=./figures/",
+          "--cuda_visible_devices=2",
+        ],      
+        "program": "evaluate.py",
+        "justMyCode": false,
+        "console": "integratedTerminal",
+        "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
+      },
+
       
       {
         "name": "poison.py-P_NT1",

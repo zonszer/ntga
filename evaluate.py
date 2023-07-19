@@ -36,6 +36,7 @@ parser.add_argument("--x_test_path", default=None, type=str, help="path for test
 parser.add_argument("--epoch", default=50, type=int, help="training epochs")
 parser.add_argument("--batch_size", default=64, type=int, help="batch size")
 parser.add_argument("--save_path", default="", type=str, help="path to save figures")
+parser.add_argument("--model_save_path", default="data/model", type=str, help="path to save figures")
 parser.add_argument("--cuda_visible_devices", default="0", type=str, help="specify which GPU to run \
                     an application on")
 
@@ -150,7 +151,7 @@ class Model():
         self.test_loss = tf.keras.metrics.Mean(name='test_loss')
         self.test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
     
-    @tf.function
+    #@tf.function
     def train_step(self, images, labels):
         with tf.GradientTape() as tape:
             predictions = self.model(images, training=True)
@@ -161,15 +162,15 @@ class Model():
         self.train_loss(loss)
         self.train_accuracy(labels, predictions)
         
-    @tf.function
+    #@tf.function
     def test_step(self, images, labels):
-        predictions = self.model(images, training=False)
+        predictions = self.model(images, training=False)    #output = TensorShape([128, 10])
         t_loss = self.loss_object(labels, predictions)
 
         self.test_loss(t_loss)
         self.test_accuracy(labels, predictions)
         
-    @tf.function
+    #@tf.function
     def inference_step(self, images):
         predictions = self.model(images, training=False)
         return predictions
@@ -191,7 +192,7 @@ class Model():
                 self.train_step(images, labels)
 
             for test_images, test_labels in test_ds:
-                self.test_step(test_images, test_labels)
+                self.test_step(test_images, test_labels)    #TensorShape([128, 32, 32, 3]) TensorShape([128, 10])
 
             template = 'Epoch {:0}, Loss: {:.4f}, Accuracy: {:.4f}, Test Loss: {:.4f}, Test Accuracy: {:.4f}'
             print (template.format(e+1,
@@ -281,7 +282,7 @@ def main():
     train_acc, train_l, val_acc, val_l = model.train(args.epoch, train_ds, val_ds)
     
     ts = onp.arange(1, args.epoch+1, 1)
-    plot_learning_curve(train_acc, val_acc, ts, "Accuracy", args.dtype)
+    # plot_learning_curve(train_acc, val_acc, ts, "Accuracy", args.dtype)
 #     plot_learning_curve(train_l, val_l, ts, "Loss", args.dtype)
 
     if args.x_test_path:
@@ -294,6 +295,14 @@ def main():
         id = [i for i in range(len(y_pred))]
         result = pd.DataFrame({'id': id, 'label': y_pred})
         result.to_csv("y_pred_{:s}.csv".format(args.dataset), index=False)
+
+    # Save the model
+    if not os.path.exists(args.model_save_path):
+        os.makedirs(args.model_save_path)
+    model.model.save(os.path.join(args.model_save_path, 
+                              f"model_{args.dataset}_{args.model_type}_{args.dtype}"))
+    # new_model = tf.keras.models.load_model(os.path.join(args.model_save_path, 
+    #                             f"model_{args.dataset}_{args.model_type}_{args.dtype}"))
     print("================== DONE ==================")
     
 if __name__ == "__main__":

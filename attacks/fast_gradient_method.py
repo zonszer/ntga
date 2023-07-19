@@ -46,25 +46,29 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
         
     x = x_train
     
-    if y_test is None:
+    if y_test is None: 
         # Using model predictions as ground truth to avoid label leaking
-        x_labels = np.argmax(model_fn(kernel_fn, x_train, x_test, fx_train_0, fx_test_0)[1], 1)
-        y_test = one_hot(x_labels, num_classes)
+        y_test = get_NTmodel_pred()
+        ##maybe need to transform to values that all sum to 1 TODO:
         
     # Objective function - Θ(test, train)Θ(train, train)^-1(1-e^{-eta*t*Θ(train, train)})y_train
     if batch_size is None:
         batch_size = len(x_test)
     grads = 0
-    for i in range(int(len(x_test)/batch_size)):
-        batch_grads = grads_fn(x_train, 
-                               x_test[batch_size*i:batch_size*(i+1)], #why X_test.shape != X_train.shape?
-                               y_train, 
-                               y_test[batch_size*i:batch_size*(i+1)], 
-                               kernel_fn, 
-                               loss,
-                               t,   #!t is used to compute poisoned data
-                               targeted)    #主要还是不知道它grad ascent是咋实现？A: +grad 为ascent, -grad为descent
-        grads += batch_grads    #!cumulative sum of all batches in test set
+
+
+    # for i in range(int(len(x_test)/batch_size)):  #TODO: 是不是这里最好还是有cycle比较好（取所有测试集中所有标签相同的图的logits，拟合其分布？）
+    batch_grads = grads_fn(x_train, 
+                            x_test,     #   X_test.shape != X_train.shape
+                            y_train, 
+                            y_test(x_test), 
+                            kernel_fn, 
+                            loss,
+                            t,   #!t is used to compute poisoned data
+                            targeted)    #主要还是不知道它grad ascent是咋实现？A: +grad 为ascent, -grad为descent
+    grads += batch_grads    #!cumulative sum of all batches in test set
+
+
 
     axis = list(range(1, len(grads.shape)))
     avoid_zero_div = 1e-12
@@ -85,3 +89,12 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
         adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         
     return adv_x
+
+def get_NTmodel_pred():
+    tech_model = torch.load('data/NT_model/tech_model_1.pth')
+    tech_model.eval()
+    # tech_model = tf.keras.models.load_model('tech_model.h5')
+    def get_model_pred(x_test):
+        y_pred = tech_model(x_test)
+        return y_pred
+    return get_model_pred
