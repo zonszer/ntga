@@ -2,7 +2,6 @@ from easydict import EasyDict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision
 
 # from cleverhans.torch.attacks.fast_gradient_method import fast_gradient_method
 # from cleverhans.torch.attacks.projected_gradient_descent import (
@@ -140,7 +139,7 @@ def kl_divergence_loss_with_temperature(output_stu, output_tch, T, reduction='ba
     #     raise ValueError("Invalid reduction method. Choose 'batchmean' or 'sum'.")
 
     kl_loss = kl_loss * (T * T)
-    return kl_loss
+    return kl_loss.mean()
 
 def NT_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='KL', t=None, targeted=True, diag_reg=1e-4, T=4.0):
     # Kernel
@@ -148,8 +147,7 @@ def NT_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='KL', t=None, targ
     # ntk_test_train = kernel_fn(x_test, x_train, 'ntk')      #shape=(30, 512)  #changed 1:
     
     # Prediction    #why not use gradient_descent_mse_ensemble?
-    if y_train.ndim == 1:
-        y_train = y_train.reshape(-1, 1)
+    #y_train.shape is (512, 10)
     predict_fn = nt.predict.gradient_descent_mse(ntk_train_train, y_train, diag_reg=diag_reg)   #need change here TODO #maybe changed 1.5?
     fx = predict_fn(t, 0., 0., ntk_train_train)[1]       #changed 2: t is time when poision occurs, also equals time step used to compute poisoned data
     # what zero means? A:  predict_fn(t, fx_train_0, fx_test_0, k_test_train)
@@ -251,6 +249,7 @@ def main(args):
     model_T = get_model(args, num_class=args.num_classes)
     train_loader, test_loader = fetch_dataloader(args)
     x_train_all, y_train_all = next(iter(train_loader)) #a, b =next(iter(test_loader))
+    y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes)
     y_target_all = get_y_traget(x_train_all.to(args.device), model_T) 
     torch.cuda.empty_cache()
 
