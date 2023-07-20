@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 terminal_orders_NTGA.txt
+.idea
+Saved_Models
+
 
 # C extensions
 *.so
@@ -138,4 +141,3 @@ dmypy.json
 .Trashes
 ehthumbs.db
 Thumbs.db
-terminal_orders_NTGA.txt
