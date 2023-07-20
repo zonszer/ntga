@@ -48,7 +48,7 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
             Targeted will instead try to move in the direction of being more like y.
     :return: a tensor for the poisoned data.
     """
-    assert eps_iter <= eps, (eps_iter, eps)
+    assert eps_iter <= eps, (eps_iter, eps) #here (eps_iter, eps) is the shown values when assert fails
     if norm == 1:
         raise NotImplementedError("It's not clear that FGM is a good inner loop"
                                   " step for PGD when norm=1, because norm=1 FGM "
@@ -59,7 +59,7 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
         raise ValueError("Norm order must be either np.inf or 2.")
         
     x = x_train
-
+    # if y_test is None:
         # x_labels = np.argmax(model_fn(kernel_fn, x_train, x_test, fx_train_0, fx_test_0)[1], 1)
         # y_test = one_hot(x_labels, num_classes)
         

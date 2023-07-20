@@ -46,14 +46,14 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
         
     x = x_train
     
-    if y_test is None: 
+    # if y_test is None: 
         # Using model predictions as ground truth to avoid label leaking
-        y_test = get_NTmodel_pred()
+        # y_test = get_NTmodel_pred()
         ##maybe need to transform to values that all sum to 1 TODO:
         
     # Objective function - Θ(test, train)Θ(train, train)^-1(1-e^{-eta*t*Θ(train, train)})y_train
     if batch_size is None:
-        batch_size = len(x_test)
+        batch_size = x_train.shape[0]   
     grads = 0
 
 
@@ -61,7 +61,7 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
     batch_grads = grads_fn(x_train, 
                             x_test,     #   X_test.shape != X_train.shape
                             y_train, 
-                            y_test(x_test), 
+                            y_test, 
                             kernel_fn, 
                             loss,
                             t,   #!t is used to compute poisoned data
@@ -89,12 +89,3 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
         adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         
     return adv_x
-
-def get_NTmodel_pred():
-    tech_model = torch.load('data/NT_model/tech_model_1.pth')
-    tech_model.eval()
-    # tech_model = tf.keras.models.load_model('tech_model.h5')
-    def get_model_pred(x_test):
-        y_pred = tech_model(x_test)
-        return y_pred
-    return get_model_pred

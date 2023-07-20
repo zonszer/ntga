@@ -1,52 +1,127 @@
-import tensorflow as tf
-import tensorflow.keras as keras
-import tensorflow.keras.layers as layers
+"""
+dense net in pytorch
+[1] Gao Huang, Zhuang Liu, Laurens van der Maaten, Kilian Q. Weinberger.
+    Densely Connected Convolutional Networks
+    https://arxiv.org/abs/1608.06993v5
+"""
 
-def dense_block(x, blocks, name, growth_rate = 32):
-    for i in range(blocks):
-        x = conv_block(x, growth_rate, name=name + '_block' + str(i + 1))
-    return x
+import torch
+import torch.nn as nn
 
-def transition_block(x, reduction, name):
-    x = layers.BatchNormalization(axis=3, epsilon=1.001e-5,name=name + '_bn')(x)
-    x = layers.Activation('relu', name=name + '_relu')(x)
-    filter = x.shape[3]
-    x = layers.Conv2D(int(filter*reduction), 1,use_bias=False,name=name + '_conv')(x)
-    x = layers.AveragePooling2D(2, strides=2, name=name + '_pool')(x)
-    return x
 
-def conv_block(x, growth_rate, name):
-    x1 = layers.BatchNormalization(axis=3, epsilon=1.001e-5)(x)
-    x1 = layers.Activation('relu')(x1)
-    x1 = layers.Conv2D(2 * growth_rate, 1,use_bias=False, name=name + '_1_conv')(x1)
-    x1 = layers.BatchNormalization(axis=3, epsilon=1.001e-5)(x1)
-    x1 = layers.Activation('relu', name=name + '_1_relu')(x1)
-    x1 = layers.Conv2D(growth_rate, 3 ,padding='same',use_bias=False, name=name + '_2_conv')(x1)
-    x = layers.Concatenate( name=name + '_concat')([x, x1])
-    return x
 
-def DenseNet121(input_shape, num_classes):
-    inputs = keras.Input(shape=input_shape, name='img')
-    if input_shape != (224, 224, 3):
-        # MNIST and CIFAR-10
-        x = layers.Conv2D(filters=16, kernel_size=(3, 3), strides=(1, 1), padding='same', activation='relu')(inputs)
-        x = layers.BatchNormalization()(x)
-    else:
-        # 2-class ImageNet
-        x = layers.Conv2D(filters=64, kernel_size=(7, 7), strides=(2, 2), padding='same', activation='relu')(inputs)
-        x = layers.BatchNormalization()(x)
-        x = layers.MaxPool2D(pool_size=(3, 3), strides=(2, 2), padding="same")(x)
-    blocks = [4,8,16]
-    x = dense_block(x, blocks[0], name='conv1',growth_rate =32)
-    x = transition_block(x, 0.5, name='pool1')
-    x = dense_block(x, blocks[1], name='conv2',growth_rate =32)
-    x = transition_block(x, 0.5, name='pool2')
-    x = dense_block(x, blocks[2], name='conv3',growth_rate =32)
-    x = transition_block(x, 0.5, name='pool3')
-    x = layers.BatchNormalization(axis=3, epsilon=1.001e-5, name='bn')(x)
-    x = layers.Activation('relu', name='relu')(x)
+#"""Bottleneck layers. Although each layer only produces k
+#output feature-maps, it typically has many more inputs. It
+#has been noted in [37, 11] that a 1×1 convolution can be in-
+#troduced as bottleneck layer before each 3×3 convolution
+#to reduce the number of input feature-maps, and thus to
+#improve computational efficiency."""
+class Bottleneck(nn.Module):
+    def __init__(self, in_channels, growth_rate):
+        super().__init__()
+        #"""In  our experiments, we let each 1×1 convolution
+        #produce 4k feature-maps."""
+        inner_channel = 4 * growth_rate
 
-    x = layers.GlobalAveragePooling2D(name='avg_pool')(x)
-    x = layers.Dense(num_classes, activation='softmax', name='fc1000')(x)
-    model = keras.Model(inputs, x, name='densenet121')
-    return model
+        #"""We find this design especially effective for DenseNet and
+        #we refer to our network with such a bottleneck layer, i.e.,
+        #to the BN-ReLU-Conv(1×1)-BN-ReLU-Conv(3×3) version of H ` ,
+        #as DenseNet-B."""
+        self.bottle_neck = nn.Sequential(
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, inner_channel, kernel_size=1, bias=False),
+            nn.BatchNorm2d(inner_channel),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(inner_channel, growth_rate, kernel_size=3, padding=1, bias=False)
+        )
+
+    def forward(self, x):
+        return torch.cat([x, self.bottle_neck(x)], 1)
+
+#"""We refer to layers between blocks as transition
+#layers, which do convolution and pooling."""
+class Transition(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        #"""The transition layers used in our experiments
+        #consist of a batch normalization layer and an 1×1
+        #convolutional layer followed by a 2×2 average pooling
+        #layer""".
+        self.down_sample = nn.Sequential(
+            nn.BatchNorm2d(in_channels),
+            nn.Conv2d(in_channels, out_channels, 1, bias=False),
+            nn.AvgPool2d(2, stride=2)
+        )
+
+    def forward(self, x):
+        return self.down_sample(x)
+
+#DesneNet-BC
+#B stands for bottleneck layer(BN-RELU-CONV(1x1)-BN-RELU-CONV(3x3))
+#C stands for compression factor(0<=theta<=1)
+class DenseNet(nn.Module):
+    def __init__(self, block, nblocks, growth_rate=12, reduction=0.5, num_class=100):
+        super().__init__()
+        self.growth_rate = growth_rate
+
+        #"""Before entering the first dense block, a convolution
+        #with 16 (or twice the growth rate for DenseNet-BC)
+        #output channels is performed on the input images."""
+        inner_channels = 2 * growth_rate
+
+        #For convolutional layers with kernel size 3×3, each
+        #side of the inputs is zero-padded by one pixel to keep
+        #the feature-map size fixed.
+        self.conv1 = nn.Conv2d(3, inner_channels, kernel_size=3, padding=1, bias=False)
+
+        self.features = nn.Sequential()
+
+        for index in range(len(nblocks) - 1):
+            self.features.add_module("dense_block_layer_{}".format(index), self._make_dense_layers(block, inner_channels, nblocks[index]))
+            inner_channels += growth_rate * nblocks[index]
+
+            #"""If a dense block contains m feature-maps, we let the
+            #following transition layer generate θm output feature-
+            #maps, where 0 < θ ≤ 1 is referred to as the compression
+            #fac-tor.
+            out_channels = int(reduction * inner_channels) # int() will automatic floor the value
+            self.features.add_module("transition_layer_{}".format(index), Transition(inner_channels, out_channels))
+            inner_channels = out_channels
+
+        self.features.add_module("dense_block{}".format(len(nblocks) - 1), self._make_dense_layers(block, inner_channels, nblocks[len(nblocks)-1]))
+        inner_channels += growth_rate * nblocks[len(nblocks) - 1]
+        self.features.add_module('bn', nn.BatchNorm2d(inner_channels))
+        self.features.add_module('relu', nn.ReLU(inplace=True))
+
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.linear = nn.Linear(inner_channels, num_class)
+
+    def forward(self, x):
+        output = self.conv1(x)
+        output = self.features(output)
+        output = self.avgpool(output)
+        output = output.view(output.size()[0], -1)
+        output = self.linear(output)
+        return output
+
+    def _make_dense_layers(self, block, in_channels, nblocks):
+        dense_block = nn.Sequential()
+        for index in range(nblocks):
+            dense_block.add_module('bottle_neck_layer_{}'.format(index), block(in_channels, self.growth_rate))
+            in_channels += self.growth_rate
+        return dense_block
+
+
+def densenet121(**kwargs):
+    return DenseNet(Bottleneck, [6,12,24,16], growth_rate=32, **kwargs)
+
+def densenet169(**kwargs):
+    return DenseNet(Bottleneck, [6,12,32,32], growth_rate=32,**kwargs)
+
+def densenet201(**kwargs):
+    return DenseNet(Bottleneck, [6,12,48,32], growth_rate=32, **kwargs)
+
+def densenet161(**kwargs):
+    return DenseNet(Bottleneck, [6,12,36,24], growth_rate=48, **kwargs)

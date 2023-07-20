@@ -1,181 +1,133 @@
-import tensorflow as tf
-from models.residual_block import make_basic_block_layer, make_bottleneck_layer
+'''ResNet in PyTorch.
 
-class ResNetTypeISmall(tf.keras.Model):
-    def __init__(self, num_classes, layer_params):
-        super(ResNetTypeISmall, self).__init__()
-        self.conv1 = tf.keras.layers.Conv2D(filters=64,
-                                            kernel_size=(3, 3),
-                                            strides=1,
-                                            padding="same")
-        self.bn1 = tf.keras.layers.BatchNormalization()
-        
-        self.layer1 = make_basic_block_layer(filter_num=64,
-                                             blocks=layer_params[0])
-        self.layer2 = make_basic_block_layer(filter_num=128,
-                                             blocks=layer_params[1],
-                                             stride=2)
-        self.layer3 = make_basic_block_layer(filter_num=256,
-                                             blocks=layer_params[2],
-                                             stride=2)
-        self.layer4 = make_basic_block_layer(filter_num=512,
-                                             blocks=layer_params[3],
-                                             stride=2)
+For Pre-activation ResNet, see 'preact_resnet.py'.
 
-        self.avgpool = tf.keras.layers.GlobalAveragePooling2D()
-        self.fc = tf.keras.layers.Dense(units=num_classes, activation=tf.keras.activations.softmax)
+Reference:
+[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
+    Deep Residual Learning for Image Recognition. arXiv:1512.03385
+'''
 
-    def call(self, inputs, training=None, mask=None):
-        x = self.conv1(inputs)
-        x = self.bn1(x, training=training)
-        x = tf.nn.relu(x)
-        x = self.layer1(x, training=training)
-        x = self.layer2(x, training=training)
-        x = self.layer3(x, training=training)
-        x = self.layer4(x, training=training)
-        x = self.avgpool(x)
-        output = self.fc(x)
-        return output
+import torch.nn as nn
+import torch.nn.functional as F
 
-class ResNetTypeI(tf.keras.Model):
-    def __init__(self, num_classes, layer_params):
-        super(ResNetTypeI, self).__init__()
-        self.conv1 = tf.keras.layers.Conv2D(filters=64,
-                                            kernel_size=(7, 7),
-                                            strides=2,
-                                            padding="same")
-        self.bn1 = tf.keras.layers.BatchNormalization()
-        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(3, 3),
-                                               strides=2,
-                                               padding="same")
-
-        self.layer1 = make_basic_block_layer(filter_num=64,
-                                             blocks=layer_params[0])
-        self.layer2 = make_basic_block_layer(filter_num=128,
-                                             blocks=layer_params[1],
-                                             stride=2)
-        self.layer3 = make_basic_block_layer(filter_num=256,
-                                             blocks=layer_params[2],
-                                             stride=2)
-        self.layer4 = make_basic_block_layer(filter_num=512,
-                                             blocks=layer_params[3],
-                                             stride=2)
-
-        self.avgpool = tf.keras.layers.GlobalAveragePooling2D()
-        self.fc = tf.keras.layers.Dense(units=num_classes, activation=tf.keras.activations.softmax)
-
-    def call(self, inputs, training=None, mask=None):
-        x = self.conv1(inputs)
-        x = self.bn1(x, training=training)
-        x = tf.nn.relu(x)
-        x = self.pool1(x)
-        x = self.layer1(x, training=training)
-        x = self.layer2(x, training=training)
-        x = self.layer3(x, training=training)
-        x = self.layer4(x, training=training)
-        x = self.avgpool(x)
-        output = self.fc(x)
-        return output
+__all__ = ['ResNet', 'ResNet18', 'ResNet34', 'ResNet50', 'ResNet101', 'ResNet152']
 
 
-class ResNetTypeIISmall(tf.keras.Model):
-    def __init__(self, num_classes, layer_params):
-        super(ResNetTypeIISmall, self).__init__()
-        self.conv1 = tf.keras.layers.Conv2D(filters=64,
-                                            kernel_size=(3, 3),
-                                            strides=1,
-                                            padding="same")
-        self.bn1 = tf.keras.layers.BatchNormalization()
+class BasicBlock(nn.Module):
+    expansion = 1
 
-        self.layer1 = make_bottleneck_layer(filter_num=64,
-                                            blocks=layer_params[0])
-        self.layer2 = make_bottleneck_layer(filter_num=128,
-                                            blocks=layer_params[1],
-                                            stride=2)
-        self.layer3 = make_bottleneck_layer(filter_num=256,
-                                            blocks=layer_params[2],
-                                            stride=2)
-        self.layer4 = make_bottleneck_layer(filter_num=512,
-                                            blocks=layer_params[3],
-                                            stride=2)
+    def __init__(self, in_planes, planes, stride=1):
+        super(BasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
 
-        self.avgpool = tf.keras.layers.GlobalAveragePooling2D()
-        self.fc = tf.keras.layers.Dense(units=num_classes, activation=tf.keras.activations.softmax)
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(self.expansion*planes)
+            )
 
-    def call(self, inputs, training=None, mask=None):
-        x = self.conv1(inputs)
-        x = self.bn1(x, training=training)
-        x = tf.nn.relu(x)
-        x = self.layer1(x, training=training)
-        x = self.layer2(x, training=training)
-        x = self.layer3(x, training=training)
-        x = self.layer4(x, training=training)
-        x = self.avgpool(x)
-        output = self.fc(x)
-        return output
-
-class ResNetTypeII(tf.keras.Model):
-    def __init__(self, num_classes, layer_params):
-        super(ResNetTypeII, self).__init__()
-        self.conv1 = tf.keras.layers.Conv2D(filters=64,
-                                            kernel_size=(7, 7),
-                                            strides=2,
-                                            padding="same")
-        self.bn1 = tf.keras.layers.BatchNormalization()
-        self.pool1 = tf.keras.layers.MaxPool2D(pool_size=(3, 3),
-                                               strides=2,
-                                               padding="same")
-
-        self.layer1 = make_bottleneck_layer(filter_num=64,
-                                            blocks=layer_params[0])
-        self.layer2 = make_bottleneck_layer(filter_num=128,
-                                            blocks=layer_params[1],
-                                            stride=2)
-        self.layer3 = make_bottleneck_layer(filter_num=256,
-                                            blocks=layer_params[2],
-                                            stride=2)
-        self.layer4 = make_bottleneck_layer(filter_num=512,
-                                            blocks=layer_params[3],
-                                            stride=2)
-
-        self.avgpool = tf.keras.layers.GlobalAveragePooling2D()
-        self.fc = tf.keras.layers.Dense(units=num_classes, activation=tf.keras.activations.softmax)
-
-    def call(self, inputs, training=None, mask=None):
-        x = self.conv1(inputs)
-        x = self.bn1(x, training=training)
-        x = tf.nn.relu(x)
-        x = self.pool1(x)
-        x = self.layer1(x, training=training)
-        x = self.layer2(x, training=training)
-        x = self.layer3(x, training=training)
-        x = self.layer4(x, training=training)
-        x = self.avgpool(x)
-        output = self.fc(x)
-        return output
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
 
 
-def ResNet18(input_shape, num_classes):
-    if input_shape != (224, 224, 3):
-        return ResNetTypeISmall(num_classes, layer_params=[2, 2, 2, 2])
-    return ResNetTypeI(num_classes, layer_params=[2, 2, 2, 2])
+class Bottleneck(nn.Module):
+    expansion = 4
 
-def ResNet34(input_shape, num_classes):
-    if input_shape != (224, 224, 3):
-        return ResNetTypeISmall(num_classes, layer_params=[3, 4, 6, 3])
-    return ResNetTypeI(num_classes, layer_params=[3, 4, 6, 3])
+    def __init__(self, in_planes, planes, stride=1):
+        super(Bottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.conv3 = nn.Conv2d(planes, self.expansion*planes, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(self.expansion*planes)
 
-def ResNet50(input_shape, num_classes):
-    if input_shape != (224, 224, 3):
-        return ResNetTypeIISmall(num_classes, layer_params=[3, 4, 6, 3])
-    return ResNetTypeII(num_classes, layer_params=[3, 4, 6, 3])
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(self.expansion*planes)
+            )
 
-def ResNet101(input_shape, num_classes):
-    if input_shape != (224, 224, 3):
-        return ResNetTypeIISmall(num_classes, layer_params=[3, 4, 23, 3])
-    return ResNetTypeII(num_classes, layer_params=[3, 4, 23, 3])
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = F.relu(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
 
-def ResNet152(input_shape, num_classes):
-    if input_shape != (224, 224, 3):
-        return ResNetTypeIISmall(num_classes, layer_params=[3, 8, 36, 3])
-    return ResNetTypeII(num_classes, layer_params=[3, 8, 36, 3])
+
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, num_classes=10):
+        super(ResNet, self).__init__()
+        self.in_planes = 64
+
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
+        self.linear = nn.Linear(512*block.expansion, num_classes)
+
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        # out = F.avg_pool2d(out, 4)
+        out = F.adaptive_avg_pool2d(out, output_size=(1, 1))     # make it suitable for 64 * 64 input (TinyImageNet)
+        out = out.view(out.size(0), -1)
+        out = self.linear(out)
+        return out
+
+
+def ResNet18(num_class=10):
+    return ResNet(BasicBlock, [2,2,2,2], num_classes=num_class)
+
+
+def ResNet34(num_class=10):
+    return ResNet(BasicBlock, [3,4,6,3], num_classes=num_class)
+
+
+def ResNet50(num_class=10):
+    return ResNet(Bottleneck, [3,4,6,3], num_classes=num_class)
+
+
+def ResNet101(num_class=10):
+    return ResNet(Bottleneck, [3,4,23,3], num_classes=num_class)
+
+
+def ResNet152(num_class=10):
+    return ResNet(Bottleneck, [3,8,36,3], num_classes=num_class)
+
+
+if __name__ == "__main__":
+    import torch
+
+    model = ResNet18(200)
+    x = torch.randn(2,3,64,64)
+    y = model(x)
+    print(y.shape)
+
+    x = torch.randn(2,3,32,32)
+    y = model(x)
+    print(y.shape)

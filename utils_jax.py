@@ -4,7 +4,6 @@ from jax import lax
 from jax.experimental.stax import logsoftmax
 from jax.config import config
 config.update('jax_enable_x64', True)
-import tensorflow as tf
 
 from functools import partial
 import neural_tangents as nt
@@ -154,20 +153,3 @@ def mse_loss(logits, lables):
     :return: a float for loss.
     """
     return 0.5 * np.mean((logits - lables) ** 2)
-
-@jit
-def kl_divergence_loss_with_temperature(output_stu, output_tch, T, reduction='batchmean'):
-    '''the stu should mimic the tch output'''
-    log_softmax_stu = tf.math.log_softmax(output_stu / T, axis=1)
-    softmax_tch = tf.nn.softmax(output_tch / T, axis=1)
-    kl_loss = tf.keras.losses.KLDivergence(reduction=tf.keras.losses.Reduction.NONE)(softmax_tch, log_softmax_stu)
-    
-    if reduction == 'batchmean':
-        kl_loss = tf.reduce_mean(kl_loss)
-    elif reduction == 'sum':
-        kl_loss = tf.reduce_sum(kl_loss)
-    else:
-        raise ValueError("Invalid reduction method. Choose 'batchmean' or 'sum'.")
-
-    kl_loss = kl_loss * (T * T)
-    return kl_loss

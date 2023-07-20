@@ -18,6 +18,25 @@
         "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
       },
       {
+        "name": "generate_attack_NT.py",
+        "type": "python",
+        "request": "launch",
+        "python": "python",
+        "args": [
+            "--id=debug_gen_NT",
+            "--fn_model_type=fnn",
+            "teacher_model_name=resnet18",
+            "--dataset=cifar10",
+            "--save_path=./data/",
+          "--cuda_visible_devices=0,",
+        ],      
+        "program": "generate_attack_NT.py",
+        "justMyCode": false,
+        "console": "integratedTerminal",
+        "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
+      },
+
+      {
         "name": "evaluate.py",
         "type": "python",
         "request": "launch",
