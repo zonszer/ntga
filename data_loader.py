@@ -10,28 +10,52 @@ import torchvision.transforms as transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
+class inv_transform(object):
+    def __call__(self, t):
+        """
+        Args: t (Tensor): Tensor image of size (C, H, W) to be normalized.
+        Returns: Tensor: Normalized image.
+        """
+        from albumentations.augmentations import Normalize, FromFloat, Compose
+        mean = [0.4914, 0.4822, 0.4465]
+        std = [0.247, 0.243, 0.261]
+        train_invtransformer = Compose(
+        [
+            Normalize(
+                mean=tuple(-m / s for m, s in zip(mean, std)),
+                std=tuple(1.0 / s for s in std),
+                max_pixel_value=1.0,
+            ),
+            FromFloat(max_value=255, dtype="uint8"),
+        ])
+        return train_invtransformer(t)
+
+    def __repr__(self):
+        return self.__class__.__name__+'()'
+
 def fetch_dataloader(params):
     """
     Fetch and return train/dev dataloader with hyperparameters (params.subset_percent = 1.)
     """
     # using random crops and horizontal flip for train set
+    mean = [0.4914, 0.4822, 0.4465]
+    std = [0.247, 0.243, 0.261]
     if params.augmentation:
         train_transformer = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),  # randomly flip image horizontally
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
-
+            transforms.Normalize(mean, std)])
     # data augmentation can be turned off
     else:
         train_transformer = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
+            transforms.Normalize(mean, std)])
 
     # transformer for dev set
     dev_transformer = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
+        transforms.Normalize(mean, std)])
 
     # ************************************************************************************
     if params.dataset == 'cifar10':
@@ -49,17 +73,19 @@ def fetch_dataloader(params):
 
     # ************************************************************************************
     elif params.dataset == 'tiny_imagenet':
+        mean = [0.4802, 0.4481, 0.3975]
+        std = [0.2302, 0.2265, 0.2262]
         data_dir = './data/tiny-imagenet-200/'
         data_transforms = {
             'train': transforms.Compose([
                 transforms.RandomRotation(20),
                 transforms.RandomHorizontalFlip(0.5),
                 transforms.ToTensor(),
-                transforms.Normalize([0.4802, 0.4481, 0.3975], [0.2302, 0.2265, 0.2262]),
+                transforms.Normalize(mean, std),
             ]),
             'val': transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize([0.4802, 0.4481, 0.3975], [0.2302, 0.2265, 0.2262]),
+                transforms.Normalize(mean, std),
             ])
         }
         train_dir = data_dir + 'train/'
@@ -70,12 +96,19 @@ def fetch_dataloader(params):
     if hasattr(params, 'use_entire_dataset'):
         params.batch_size = len(trainset)
 
+    invtransformer = transforms.Compose([
+        transforms.Normalize(
+            mean=tuple(-m / s for m, s in zip(mean, std)),
+            std=tuple(1.0 / s for s in std),
+        ),
+    ])
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=params.batch_size,
                                               shuffle=True, num_workers=params.num_workers)
 
     devloader = torch.utils.data.DataLoader(devset, batch_size=params.batch_size,
                                             shuffle=False, num_workers=params.num_workers)
-
+    trainloader.dataset.invtransformer = invtransformer
+    devloader.dataset.invtransformer = invtransformer
     return trainloader, devloader
 
 

@@ -12,7 +12,8 @@ parser.add_argument('--id', default='XXXX', help='name')
 parser.add_argument('--fn_model_type', default='cnn', help='surrogate model. Choose either `fnn` or `cnn`')
 parser.add_argument('--teacher_model_name', default='resnet18', help='teacher model. Choose either `resnet18` or `resnet50`')
 parser.add_argument('--dataset', required=True, default='cifar10', help="dataset. `mnist`, `cifar10`, and `imagenet` are available. For ImageNet or other dataset, please modify the path in the code directly.")
-parser.add_argument('--save_path', default="", help="path to save poisoned data")
+parser.add_argument('--save_path', default="./data/", help="path to save poisoned data")
+parser.add_argument('--norm_type', default="np.inf", help="norm type. Choose either `np.inf` or `2`")
 parser.add_argument('--cuda_visible_devices', default="0,", help='''specify which GPU to run an application on,
                                                                 example: '0,' or "0,1" ''')
 
@@ -26,9 +27,12 @@ parser.add_argument('--seed', type=int, default=0, help='random seed (default: 0
 
 # float
 parser.add_argument('--eps', type=float, help="epsilon. Strength of NTGA")
+parser.add_argument('--T', type=float, default=4.0, help="temperature of softmax in KLdiv loss")
+parser.add_argument('--sparse_ratio', type=float, default=0.2, help="sparse ratio of the logits of stingy teacher")
+parser.add_argument('--step_size', type=float, default=1.1, help="step size to calculate the args.eps_iter")
 
 # bool
-parser.add_argument('--augmentation', action='store_true', help="whether to use data augmentation")
+parser.add_argument('--augmentation', action='store_true', help="whether to use data augmentation") #not use so far
 
 
 def get_args(ipynb=False):
@@ -75,8 +79,14 @@ def clean_args(args) -> list:
     return args
 
 def combine_args(*args):
+    """assert *args have no same keys(attributes)"""
     args_dict = {}
     for arg in args:
-        args_dict.update(vars(arg))
+        arg_vars = vars(arg)
+        for key in arg_vars:
+            if key in args_dict and args_dict[key] != arg_vars[key]:
+                raise ValueError(f'Duplicate argument key found: {key} for {args_dict[key]} and {arg_vars[key]}')
+            else:
+                args_dict[key] = arg_vars[key]
     args_all = Namespace(**args_dict)
     return args_all

@@ -4,9 +4,10 @@ from attacks.fast_gradient_method import fast_gradient_method
 import torch
 
 def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t=None, 
-                               loss='cross-entropy', fx_train_0=0., fx_test_0=0., eps=0.3, eps_iter=0.03, 
-                               nb_iter=10, norm=np.inf, clip_min=None, clip_max=None, targeted=False, 
-                               rand_init=None, rand_minmax=0.3, key=None, batch_size=None):
+                               loss=None, fx_train_0=0., fx_test_0=0., eps=None, eps_iter=None, 
+                               nb_iter=None, norm=None, clip_min=None, clip_max=None, targeted=False, 
+                               rand_init=None, rand_minmax=0.3, key=None, batch_size=None,
+                               T=None):
     """
     This code is based on CleverHans library(https://github.com/cleverhans-lab/cleverhans).
     This class implements either the Basic Iterative Method
@@ -77,9 +78,26 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
         adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         
     for i in range(nb_iter):    #10 iterations for 1 batch which composed of 520 images #Q: 10iter的意义是什么？
-        adv_x = fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t, loss, 
-                                     fx_train_0, fx_test_0, eps, norm, clip_min, clip_max, targeted, batch_size)
-
+        adv_x = fast_gradient_method(
+                    model_fn = model_fn, 
+                    kernel_fn = kernel_fn, 
+                    grads_fn = grads_fn, 
+                    x_train = x_train, 
+                    y_train = y_train, 
+                    x_test = x_test, 
+                    y_test = y_test, 
+                    t = t, 
+                    loss = loss,
+                    fx_train_0 = fx_train_0, 
+                    fx_test_0 = fx_test_0, 
+                    eps = eps_iter, 
+                    norm = norm, 
+                    clip_min = clip_min, 
+                    clip_max = clip_max,
+                    targeted = targeted, 
+                    batch_size = batch_size,
+                    T = T,
+                )
         # Clipping perturbation eta to norm norm ball
         eta = adv_x - x
         eta = clip_eta(eta, norm, eps)  #先adv_x=eta + X, 后clip adv_x，再clip eta, 最终得到adv_x

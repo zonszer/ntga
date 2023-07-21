@@ -1,0 +1,30 @@
+============= export XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1
+python -utt generate_attack_NT.py \
+--id=test_NT_Pdata \
+--model_dir=Saved_Models/ \
+--fn_model_type=fnn \
+--teacher_model_name=resnet18 \
+--dataset=cifar10 \
+--save_path=./data/ \
+--norm_type=np.inf \
+--cuda_visible_devices=0, \
+--val_size=10000 \
+--t=256 \
+--nb_iter=40 \
+--block_size=512 \
+--batch_size=128 \
+--seed=0 \
+--eps=value_required \
+--T=4.0 \
+--sparse_ratio=0.2 \
+--step_size=1.1 \
+--augmentation
+
+python -utt generate_attack_NT.py --id=test_NT_Pdata-eps06 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=0, --t=256 --nb_iter=40 --norm_type=np.inf --block_size=512 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.06
+
+python -utt generate_attack_NT.py --id=test_NT_Pdata-eps09 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=0, --t=256 --nb_iter=40 --norm_type=np.inf --block_size=512 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.09
+
+python -utt generate_attack_NT.py --id=test_NT_Pdata-eps09-Norm2 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=0, --t=256 --nb_iter=40 --norm_type=2 --block_size=512 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.09
+
+
+

@@ -18,7 +18,9 @@ import pandas as pd
 import datetime
 import os, logging
 import jax.numpy as jnp
+import numpy as np
 from jax.api import grad, jit, vmap
+import jax
 from jax import random
 from jax.config import config
 config.update('jax_enable_x64', True)
@@ -127,21 +129,15 @@ def model_fn(kernel_fn, x_train=None, x_test=None, fx_train_0=0., fx_test_0=0., 
 
 def kl_divergence_loss_with_temperature(output_stu, output_tch, T, reduction='batchmean'):
     '''the stu should mimic the tch output'''
+    # jax.debug.print(f'output_stu:\n {output_stu}', ordered=True)
     log_softmax_stu = logsoftmax(output_stu / T, axis=1)
     softmax_tch = softmax(output_tch / T, axis=1)   
     kl_loss = kl_divergence(log_predictions=log_softmax_stu, targets=softmax_tch)
 
-    # if reduction == 'batchmean':
-    #     kl_loss = tf.reduce_mean(kl_loss)
-    # elif reduction == 'sum':
-    #     kl_loss = tf.reduce_sum(kl_loss)
-    # else:
-    #     raise ValueError("Invalid reduction method. Choose 'batchmean' or 'sum'.")
-
     kl_loss = kl_loss * (T * T)
     return kl_loss.mean()
 
-def NT_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='KL', t=None, targeted=True, diag_reg=1e-4, T=4.0):
+def NT_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='KL', t=None, T=None, targeted=True, diag_reg=1e-4):
     # Kernel
     ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #out shape:(512, 512)
     # ntk_test_train = kernel_fn(x_test, x_train, 'ntk')      #shape=(30, 512)  #changed 1:
@@ -153,7 +149,7 @@ def NT_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='KL', t=None, targ
     # what zero means? A:  predict_fn(t, fx_train_0, fx_test_0, k_test_train)
 
     if loss=='KL':
-        loss = kl_divergence_loss_with_temperature(fx, y_test, T)
+        loss = kl_divergence_loss_with_temperature(fx, y_test, T)   
     elif loss == 'cross-entropy':
         loss = cross_entropy_loss(fx, y_test)   #fx is predicted logits, y_test.shape=(30, 10), fx.shape=(30, 10)
     elif loss == 'mse':
@@ -224,7 +220,7 @@ def get_model(params, num_class):
 
     return model
 
-def get_y_traget(x_train_all, model, ST_model_path='resnet18_normal.tar'):
+def get_y_traget(x_train_all, model, sparse_ratio, ST_model_path='resnet18_normal.tar'):
     checkpoint = torch.load(ST_model_path)
     logger.log(logging.INFO, f'- Load pretrained NT/ST model from {ST_model_path}')
     try:
@@ -233,14 +229,24 @@ def get_y_traget(x_train_all, model, ST_model_path='resnet18_normal.tar'):
         model.load_state_dict(checkpoint['model'], strict=True)
 
     model.eval()
-    bs = 256
+    bs = 512
     y_target_all = []
     with torch.no_grad():
         for i in range(int(x_train_all.shape[0]//bs + 1)):
             y_target = model(x_train_all[i*bs: (i+1)*bs])
-            y_target_all.append(y_target)
+            y_target_sparse = create_sparse_logits(y_target, sparse_ratio)
+            y_target_all.append(y_target_sparse)
         y_target_all = torch.cat(y_target_all, dim=0)
     return y_target_all.cpu().numpy()
+
+def create_sparse_logits(logits, sparse_ratio=None):
+    num_keep  = int(sparse_ratio * logits.shape[1])    #sparse_ratio=0.2
+    value, index = torch.topk(logits, k=num_keep, dim=1)           # keep top N logits, and zero out the rest
+    # 
+    logits_sparse = torch.full(logits.shape, float("-inf")).to(logits.device)
+    row = torch.tensor([[i] * num_keep for i in range(index.shape[0])]).to(logits.device)
+    logits_sparse[row, index] = value
+    return logits_sparse
 
 
 def main(args):
@@ -249,15 +255,19 @@ def main(args):
     model_T = get_model(args, num_class=args.num_classes)
     train_loader, test_loader = fetch_dataloader(args)
     x_train_all, y_train_all = next(iter(train_loader)) #a, b =next(iter(test_loader))
-    y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes)
-    y_target_all = get_y_traget(x_train_all.to(args.device), model_T) 
+    y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes).float()
+    y_target_all = get_y_traget(x_train_all=x_train_all.to(args.device),
+                                 model=model_T, 
+                                 sparse_ratio=args.sparse_ratio) 
+    x_train_all = train_loader.dataset.invtransformer(x_train_all)
     torch.cuda.empty_cache()
 
-    y_target_all = jnp.array(y_target_all)  #TODO shape=(50000, 10)
+    y_target_all = jnp.array(y_target_all)  # shape=(50000, 10)
     x_train_all, y_train_all = _flatten(jnp.array(x_train_all)), jnp.array(y_train_all)
     x_target_all = None
 
     logger.log(logging.INFO, "Building model...")
+    key = random.PRNGKey(args.seed)
     b_std, W_std = jnp.sqrt(0.18), jnp.sqrt(1.76) # Standard deviation of initial biases and weights TODO maybe it ccan be changed
     init_fn, apply_fn, kernel_fn = surrogate_fn(args.fn_model_type, W_std, b_std, args.num_classes, args.dataset)
     apply_fn = jit(apply_fn)
@@ -272,6 +282,7 @@ def main(args):
     epoch = int(x_train_all.shape[0]/args.block_size)   #what is block_size? maybe similar to batch_size
     x_train_adv = []
     y_train_adv = []
+    loss_diff_list = []
     for idx in tqdm(range(epoch)):
         _x_train = x_train_all[idx*args.block_size:(idx+1)*args.block_size]
         _y_train = y_train_all[idx*args.block_size:(idx+1)*args.block_size]
@@ -281,15 +292,20 @@ def main(args):
                                                   x_train=_x_train, y_train=_y_train, 
                                                   x_test=None, y_test=_y_target, 
                                                   t=args.t, loss='KL', eps=args.eps, eps_iter=args.eps_iter, 
-                                                  nb_iter=args.nb_iter, clip_min=0, clip_max=1, batch_size=args.batch_size)
+                                                  nb_iter=args.nb_iter, clip_min=0, clip_max=1, batch_size=args.batch_size,
+                                                  T=args.T, norm=eval(args.norm_type))
         x_train_adv.append(_x_train_adv)
         y_train_adv.append(_y_train)
 
         # Performance of clean and poisoned data
-        _, y_pred = model_fn(kernel_fn=kernel_fn, x_train=_x_train, x_test=None, y_train=_y_target)
-        logger.log(logging.INFO, "_x_train Acc on clean data: {:.2f}".format(accuracy(y_pred, _y_train)))
-        _, y_pred = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], x_test=None, y_train=y_train_adv[-1])
-        logger.log(logging.INFO, "_x_train Acc on NTGA posion data: {:.2f}".format(accuracy(y_pred, _y_train)))
+        _, y_pred1 = model_fn(kernel_fn=kernel_fn, x_train=_x_train, x_test=None, y_train=_y_train)
+        logger.log(logging.INFO, "_x_train Acc on clean data: {:.2f}".format(accuracy(y_pred1, _y_train)))
+        _, y_pred2 = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], x_test=None, y_train=y_train_adv[-1])
+        logger.log(logging.INFO, "_x_train Acc on NTGA posion data: {:.2f}".format(accuracy(y_pred2, _y_train)))
+        loss_diff = kl_divergence_loss_with_temperature(y_pred1, _y_target, T=4.0) -  kl_divergence_loss_with_temperature(y_pred2, _y_target, T=4.0)
+        logger.log(logging.INFO, "loss_diff of clean_data - pos_data = {:.7f}".format(loss_diff), color="BLUE")
+        loss_diff_list.append(loss_diff)
+        
 
     # Save poisoned data
     x_train_adv = jnp.concatenate(x_train_adv)
@@ -306,72 +322,11 @@ def main(args):
     
     if not os.path.exists(args.save_path):
         os.makedirs(args.save_path)
-    jnp.save('{:s}x_train_{:s}_ntga_{:s}.npy'.format(args.save_path, args.dataset, args.fn_model_type), x_train_adv)
-    jnp.save('{:s}y_train_{:s}_ntga_{:s}.npy'.format(args.save_path, args.dataset, args.fn_model_type), y_train_adv)
+    jnp.save('{:s}x_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(args.save_path, args.dataset, args.fn_model_type, args.id), x_train_adv)
+    jnp.save('{:s}y_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(args.save_path, args.dataset, args.fn_model_type, args.id), y_train_adv)
+    logger.log(logging.INFO, "Avg loss_diff = {:.7f}".format(jnp.array(loss_diff_list).mean()), color="BLUE")
     logger.log(logging.INFO, "================== Successfully generate NTGA! ==================")
 
-    """# TODO from torch versionn PGD: Instantiate model, loss, and optimizer for training
-    net = CNN(in_channels=3)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if device == "cuda":
-        net = net.cuda()
-    loss_fn = torch.nn.CrossEntropyLoss(reduction="mean")
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
-
-    # Train vanilla model
-    net.train()
-    for epoch in range(1, FLAGS.nb_epochs + 1):
-        train_loss = 0.0
-        for x, y in data.train:
-            x, y = x.to(device), y.to(device)
-            if FLAGS.adv_train:
-                # Replace clean example with adversarial example for adversarial training
-                x = projected_gradient_descent(net, x, FLAGS.eps, 0.01, 40, jnp.inf)
-            optimizer.zero_grad()
-            loss = loss_fn(net(x), y)
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-        print(
-            "epoch: {}/{}, train loss: {:.3f}".format(
-                epoch, FLAGS.nb_epochs, train_loss
-            )
-        )
-
-    # Evaluate on clean and adversarial data
-    net.eval()
-    report = EasyDict(nb_test=0, correct=0, correct_fgm=0, correct_pgd=0)
-    for x, y in data.test:
-        x, y = x.to(device), y.to(device)
-        x_fgm = fast_gradient_method(net, x, FLAGS.eps, jnp.inf)
-        x_pgd = projected_gradient_descent(net, x, FLAGS.eps, 0.01, 40, jnp.inf)
-        _, y_pred = net(x).max(1)  # model prediction on clean examples
-        _, y_pred_fgm = net(x_fgm).max(
-            1
-        )  # model prediction on FGM adversarial examples
-        _, y_pred_pgd = net(x_pgd).max(
-            1
-        )  # model prediction on PGD adversarial examples
-        report.nb_test += y.size(0)
-        report.correct += y_pred.eq(y).sum().item()
-        report.correct_fgm += y_pred_fgm.eq(y).sum().item()
-        report.correct_pgd += y_pred_pgd.eq(y).sum().item()
-    print(
-        "test acc on clean examples (%): {:.3f}".format(
-            report.correct / report.nb_test * 100.0
-        )
-    )
-    print(
-        "test acc on FGM adversarial examples (%): {:.3f}".format(
-            report.correct_fgm / report.nb_test * 100.0
-        )
-    )
-    print(
-        "test acc on PGD adversarial examples (%): {:.3f}".format(
-            report.correct_pgd / report.nb_test * 100.0
-        )
-    )
-    """
 
 def add_args(args):
     if torch.cuda.is_available():
@@ -387,25 +342,33 @@ def add_args(args):
         args_dataset.flatten = True
     else:
         args_dataset.flatten = False
-
     # Epsilon, attack iteration, and step size
     if args.dataset == "mnist":
         args_dataset.num_classes = 10
         args_dataset.train_size = 60000 - args.val_size
-        args_dataset.eps = 0.3
+        if args.eps == None:
+            args_dataset.eps = 0.3
+        else:
+            args_dataset.eps = args.eps
     elif args.dataset == "cifar10":
         args_dataset.num_classes = 10
         args_dataset.train_size = 50000 - args.val_size
-        args_dataset.eps = 8/255
+        if args.eps == None:
+            args_dataset.eps = 8/255 
+        else:
+            args_dataset.eps = args.eps
     elif args.dataset == "imagenet":
         args_dataset.num_classes = 2
         args_dataset.train_size = 2220
-        args_dataset.eps = 0.1
+        if args.eps == None:
+            args_dataset.eps = 0.1
+        else:
+            args_dataset.eps = args.eps
         print("For ImageNet, please specify the file path manually.")
     else:
         raise ValueError("To load custom dataset, please modify the code directly.")
     args_dataset.use_entire_dataset = True
-    args_dataset.eps_iter = (args_dataset.eps/args.nb_iter)*1.1  #!
+    args_dataset.eps_iter = (args_dataset.eps/args.nb_iter)* args.step_size  #!
     args_dataset.num_workers = 10
     return args_dataset, args
 

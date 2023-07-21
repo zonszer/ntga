@@ -4,8 +4,9 @@ from attacks.utils import one_hot
 
 
 def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t=None, 
-                         loss='cross-entropy', fx_train_0=0., fx_test_0=0., eps=0.3, norm=np.inf, 
-                         clip_min=None, clip_max=None, targeted=False, batch_size=None):
+                         loss=None, fx_train_0=0., fx_test_0=0., eps=None, norm=None, 
+                         clip_min=None, clip_max=None, targeted=False, batch_size=None,
+                         T=None):
     """
     This code is based on CleverHans library(https://github.com/cleverhans-lab/cleverhans).
     JAX implementation of the Fast Gradient Method.
@@ -56,18 +57,16 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
         batch_size = x_train.shape[0]   
     grads = 0
 
-
     # for i in range(int(len(x_test)/batch_size)):  #TODO: 是不是这里最好还是有cycle比较好（取所有测试集中所有标签相同的图的logits，拟合其分布？）
-    batch_grads = grads_fn(x_train, 
+    batch_grads = grads_fn(x_train,
                             x_test,     #   X_test.shape != X_train.shape
-                            y_train, 
-                            y_test, 
-                            kernel_fn, 
+                            y_train,
+                            y_test,
+                            kernel_fn,
                             loss,
                             t,   #!t is used to compute poisoned data
-                            targeted)    #主要还是不知道它grad ascent是咋实现？A: +grad 为ascent, -grad为descent
+                            T) #主要还是不知道它grad ascent是咋实现？A: +grad 为ascent, -grad为descent
     grads += batch_grads    #!cumulative sum of all batches in test set
-
 
 
     axis = list(range(1, len(grads.shape)))
@@ -79,7 +78,8 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
     elif norm == 2:
         square = np.maximum(avoid_zero_div, np.sum(np.square(grads), axis=axis, keepdims=True))
         perturbation = grads / np.sqrt(square)  #！
-    
+    else:
+        raise ValueError("Norm order must be either np.inf or 2.")
     adv_x = x + perturbation    
     
     # If clipping is needed, reset all values outside of [clip_min, clip_max]
