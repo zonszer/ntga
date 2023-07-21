@@ -320,10 +320,13 @@ def main(args):
     else:
         raise ValueError("Please specify the image size manually.")
     
-    if not os.path.exists(args.save_path):
-        os.makedirs(args.save_path)
-    jnp.save('{:s}x_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(args.save_path, args.dataset, args.fn_model_type, args.id), x_train_adv)
-    jnp.save('{:s}y_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(args.save_path, args.dataset, args.fn_model_type, args.id), y_train_adv)
+    save_path = pjoin(args.save_path, args.dataset)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    jnp.save('{:s}/x_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(save_path, args.dataset, args.fn_model_type, args.id), 
+             x_train_adv)
+    jnp.save('{:s}/y_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(save_path, args.dataset, args.fn_model_type, args.id),
+              y_train_adv)
     logger.log(logging.INFO, "Avg loss_diff = {:.7f}".format(jnp.array(loss_diff_list).mean()), color="BLUE")
     logger.log(logging.INFO, "================== Successfully generate NTGA! ==================")
 
