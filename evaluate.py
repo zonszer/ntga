@@ -36,7 +36,7 @@ parser.add_argument("--x_test_path", default=None, type=str, help="path for test
 parser.add_argument("--epoch", default=50, type=int, help="training epochs")
 parser.add_argument("--batch_size", default=64, type=int, help="batch size")
 parser.add_argument("--save_path", default="", type=str, help="path to save figures")
-parser.add_argument("--cuda_visible_devices", default="0", type=str, help="specify which GPU to run \
+parser.add_argument("--cuda_visible_devices", default="2", type=str, help="specify which GPU to run \
                     an application on")
 
 args = parser.parse_args()
@@ -150,7 +150,6 @@ class Model():
         self.test_loss = tf.keras.metrics.Mean(name='test_loss')
         self.test_accuracy = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
     
-    @tf.function
     def train_step(self, images, labels):
         with tf.GradientTape() as tape:
             predictions = self.model(images, training=True)
