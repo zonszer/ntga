@@ -255,7 +255,7 @@ def main(args):
     model_T = get_model(args, num_class=args.num_classes)
     train_loader, test_loader = fetch_dataloader(args)
     x_train_all, y_train_all = next(iter(train_loader)) #a, b =next(iter(test_loader))
-    y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes).float()
+    y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes).double()
     y_target_all = get_y_traget(x_train_all=x_train_all.to(args.device),
                                  model=model_T, 
                                  sparse_ratio=args.sparse_ratio) 
@@ -279,7 +279,7 @@ def main(args):
     
     # Generate Neural Tangent Generalization Attacks (NTGA)
     logger.log(logging.INFO, "Generating NTGA....")
-    epoch = int(x_train_all.shape[0]/args.block_size)   #what is block_size? maybe similar to batch_size
+    epoch = x_train_all.shape[0]//args.block_size + 1   #what is block_size? maybe similar to batch_size
     x_train_adv = []
     y_train_adv = []
     loss_diff_list = []
@@ -312,11 +312,11 @@ def main(args):
     y_train_adv = jnp.concatenate(y_train_adv)
     
     if args.dataset == "mnist":
-        x_train_adv = x_train_adv.reshape(-1, 28, 28, 1)
+        x_train_adv = x_train_adv.reshape(-1, 1, 28, 28)
     elif args.dataset == "cifar10":
-        x_train_adv = x_train_adv.reshape(-1, 32, 32, 3)
+        x_train_adv = x_train_adv.reshape(-1, 3, 32, 32)
     elif args.dataset == "imagenet":
-        x_train_adv = x_train_adv.reshape(-1, 224, 224, 3)
+        x_train_adv = x_train_adv.reshape(-1, 3, 224, 224)
     else:
         raise ValueError("Please specify the image size manually.")
     
@@ -325,8 +325,11 @@ def main(args):
         os.makedirs(save_path)
     jnp.save('{:s}/x_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(save_path, args.dataset, args.fn_model_type, args.id), 
              x_train_adv)
+    # jnp.save('{:s}/y_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(save_path, args.dataset, args.fn_model_type, args.id),
+    #           y_train_adv)
     jnp.save('{:s}/y_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(save_path, args.dataset, args.fn_model_type, args.id),
-              y_train_adv)
+              jnp.argmax(y_train_adv, axis=1))
+    
     logger.log(logging.INFO, "Avg loss_diff = {:.7f}".format(jnp.array(loss_diff_list).mean()), color="BLUE")
     logger.log(logging.INFO, "================== Successfully generate NTGA! ==================")
 
@@ -386,6 +389,7 @@ with measure_time():
     logger._init(pjoin(args.model_dir, args.save_name, f'train-{current_time}.log'))
 
     become_deterministic(args.seed)
+    torch.set_default_dtype(torch.float64)
 
     file_saver._init(args.save_name, args.model_dir, args)
     file_saver.save(save_type='setup', save_name='args:', value=args)

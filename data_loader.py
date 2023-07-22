@@ -8,6 +8,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data import Dataset
 
 
 class inv_transform(object):
@@ -32,6 +33,28 @@ class inv_transform(object):
 
     def __repr__(self):
         return self.__class__.__name__+'()'
+
+class Cifar10Dataset(Dataset):
+    def __init__(self, x_path, y_path, transform=None):
+        super().__init__()
+        self.data = np.load(x_path)
+        self.targets = np.load(y_path)
+        # Convert to Tensor
+        self.data = torch.from_numpy(self.data).float()
+        self.targets = torch.from_numpy(self.targets).long()
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x = self.data[index]
+        y = self.targets[index]
+        if self.transform:
+            # Converts the data from numpy to torch tensor
+            x = self.transform(x)
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+
 
 def fetch_dataloader(params):
     """
@@ -59,17 +82,19 @@ def fetch_dataloader(params):
 
     # ************************************************************************************
     if params.dataset == 'cifar10':
-        trainset = torchvision.datasets.CIFAR10(root='../stingy-teacher/data/data-cifar10', train=True,
+        trainset = torchvision.datasets.CIFAR10(root='/home/dayong/CV/registration/ZJH/stingy-teacher/data/data-cifar10', 
+                                                train=True,
                                                 download=True, transform=train_transformer)
-        devset = torchvision.datasets.CIFAR10(root='../stingy-teacher/data/data-cifar10', train=False,
+        devset = torchvision.datasets.CIFAR10(root='/home/dayong/CV/registration/ZJH/stingy-teacher/data/data-cifar10', train=False,
                                               download=True, transform=dev_transformer)
     
     # ************************************************************************************
     elif params.dataset == 'cifar100':
-        trainset = torchvision.datasets.CIFAR100(root='../stingy-teacher/data/data-cifar100', train=True,
+        trainset = torchvision.datasets.CIFAR100(root='/home/dayong/CV/registration/ZJH/stingy-teacher/data/data-cifar100', train=True,
                                                 download=True, transform=train_transformer)
-        devset = torchvision.datasets.CIFAR100(root='../stingy-teacher/data/data-cifar100', train=False,
-                                              download=True, transform=dev_transformer)
+        devset = torchvision.datasets.CIFAR100(root='/home/dayong/CV/registration/ZJH/stingy-teacher/data/data-cifar100',
+                                               train=False,
+                                               download=True, transform=dev_transformer)
 
     # ************************************************************************************
     elif params.dataset == 'tiny_imagenet':
