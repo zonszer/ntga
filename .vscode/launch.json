@@ -17,19 +17,7 @@
         "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
       },
       
-      {
-        "name": "poison.py-P_NT1",
-        "type": "python",
-        "request": "launch",
-        "python": "python",
-        "args": [
-            "--id=debug_PGD",
-            "--poison_type=NT_fromNormalModel",
-        ],      
-        "program": "poison.py",
-        "console": "integratedTerminal",
-        "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
-      },
+
       {
         "name": "evaluate.py",
         "justMyCode": false,

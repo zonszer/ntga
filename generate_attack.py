@@ -198,10 +198,10 @@ def main():
         y_train_adv.append(_y_train)
 
         # Performance of clean and poisoned data
-        _, y_pred = model_fn(kernel_fn=kernel_fn, x_train=_x_train, x_test=x_test, y_train=_y_train)
-        print("Clean Acc: {:.2f}".format(accuracy(y_pred, y_test)))
-        _, y_pred = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], x_test=x_test, y_train=y_train_adv[-1])
-        print("NTGA Robustness: {:.2f}".format(accuracy(y_pred, y_test)))
+        _, y_pred1 = model_fn(kernel_fn=kernel_fn, x_train=_x_train, x_test=x_test, y_train=_y_train)
+        print("Clean Acc: {:.2f}".format(accuracy(y_pred1, y_test)))
+        _, y_pred2 = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], x_test=x_test, y_train=y_train_adv[-1])
+        print("NTGA Robustness: {:.2f}".format(accuracy(y_pred2, y_test)))
     
     # Save poisoned data
     x_train_adv = np.concatenate(x_train_adv)
