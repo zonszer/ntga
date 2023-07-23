@@ -63,6 +63,8 @@ def fetch_dataloader(params):
     # using random crops and horizontal flip for train set
     mean = [0.4914, 0.4822, 0.4465]
     std = [0.247, 0.243, 0.261]
+    CIFAR10_path = '../stingy-teacher/data/data-cifar10'
+    CIFAR100_path = '../stingy-teacher/data/data-cifar100'
     if params.augmentation:
         train_transformer = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
@@ -82,17 +84,17 @@ def fetch_dataloader(params):
 
     # ************************************************************************************
     if params.dataset == 'cifar10':
-        trainset = torchvision.datasets.CIFAR10(root='/home/dayong/CV/registration/ZJH/stingy-teacher/data/data-cifar10', 
+        trainset = torchvision.datasets.CIFAR10(root=CIFAR10_path,
                                                 train=True,
                                                 download=True, transform=train_transformer)
-        devset = torchvision.datasets.CIFAR10(root='/home/dayong/CV/registration/ZJH/stingy-teacher/data/data-cifar10', train=False,
+        devset = torchvision.datasets.CIFAR10(root=CIFAR10_path, train=False,
                                               download=True, transform=dev_transformer)
     
     # ************************************************************************************
     elif params.dataset == 'cifar100':
-        trainset = torchvision.datasets.CIFAR100(root='/home/dayong/CV/registration/ZJH/stingy-teacher/data/data-cifar100', train=True,
+        trainset = torchvision.datasets.CIFAR100(root=CIFAR100_path, train=True,
                                                 download=True, transform=train_transformer)
-        devset = torchvision.datasets.CIFAR100(root='/home/dayong/CV/registration/ZJH/stingy-teacher/data/data-cifar100',
+        devset = torchvision.datasets.CIFAR100(root=CIFAR100_path,
                                                train=False,
                                                download=True, transform=dev_transformer)
 

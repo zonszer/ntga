@@ -20,10 +20,16 @@ python -utt generate_attack_NT.py \
 --step_size=1.1 \
 --augmentation
 
-python -utt generate_attack_NT.py --id=test_NT_Pdata-eps06 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=0, --t=256 --nb_iter=40 --norm_type=np.inf --block_size=512 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.06
+
+===============stringy teacher 
+python -utt generate_attack_NT.py --id=test_NT_Pdata-eps06 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=256 --nb_iter=40 --norm_type=np.inf --block_size=512 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.06
 
 python -utt generate_attack_NT.py --id=test_NT_Pdata-eps09 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=0, --t=256 --nb_iter=40 --norm_type=np.inf --block_size=512 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.09
 
 python -utt generate_attack_NT.py --id=test_NT_Pdata-eps09-Norm2 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=0, --t=256 --nb_iter=40 --norm_type=2 --block_size=512 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.09
 
 python -utt generate_attack_NT.py --id=test_NT_Pdata-eps09-Norm2-iter80 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=0, --t=256 --nb_iter=80 --norm_type=2 --block_size=512 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.09 (same with iter40
+
+===============Nasty teacher 
+
+python -utt generate_attack_NT.py --id=test_NT_Pdata-eps06 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=4096 --nb_iter=40 --norm_type=np.inf --block_size=512 --seed=0 --T=4.0 --step_size=1.1 --eps=0.06

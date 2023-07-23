@@ -220,7 +220,7 @@ def get_model(params, num_class):
 
     return model
 
-def get_y_traget(x_train_all, model, sparse_ratio, ST_model_path='resnet18_normal.tar'):
+def get_y_traget(x_train_all, model, sparse_ratio, ST_model_path='resnet18_nasty.tar'):
     checkpoint = torch.load(ST_model_path)
     logger.log(logging.INFO, f'- Load pretrained NT/ST model from {ST_model_path}')
     try:
@@ -234,8 +234,10 @@ def get_y_traget(x_train_all, model, sparse_ratio, ST_model_path='resnet18_norma
     with torch.no_grad():
         for i in range(int(x_train_all.shape[0]//bs + 1)):
             y_target = model(x_train_all[i*bs: (i+1)*bs])
-            y_target_sparse = create_sparse_logits(y_target, sparse_ratio)
-            y_target_all.append(y_target_sparse)
+            if 'normal' in ST_model_path or 'stingy' in ST_model_path:
+                logger.log(logging.INFO, f'create corresponding sparse logits for {ST_model_path}', color='BLUE')
+                y_target = create_sparse_logits(y_target, sparse_ratio)
+            y_target_all.append(y_target)
         y_target_all = torch.cat(y_target_all, dim=0)
     return y_target_all.cpu().numpy()
 
@@ -335,9 +337,9 @@ def main(args):
 
 
 def add_args(args):
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_visible_devices  #env must be set before torch.cude is called for the first time
     if torch.cuda.is_available():
         device = torch.device("cuda")
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_visible_devices
     else:
         device = torch.device("cpu")
     args.device = device
@@ -389,7 +391,7 @@ with measure_time():
     logger._init(pjoin(args.model_dir, args.save_name, f'train-{current_time}.log'))
 
     become_deterministic(args.seed)
-    torch.set_default_dtype(torch.float64)
+    #torch.set_default_dtype(torch.float64)
 
     file_saver._init(args.save_name, args.model_dir, args)
     file_saver.save(save_type='setup', save_name='args:', value=args)

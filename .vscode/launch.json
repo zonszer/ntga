@@ -28,8 +28,8 @@
             "teacher_model_name=resnet18",
             "--dataset=cifar10",
             "--save_path=./data/",
-          "--cuda_visible_devices=0,",
-          "--t=256",
+          "--cuda_visible_devices=2,",
+          "--t=4096",
           "--nb_iter=40",
           "--eps=0.06",
         ],      
@@ -72,31 +72,6 @@
         "console": "integratedTerminal",
         "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
       },
-      {
-        "name": "test_onebatch",   
-        "type": "python",
-        "request": "launch",
-        "python": "python",
-        "args": [
-          "--id=test_onebatch",
-          "--data_path=data/OER-Summary-LZ-1iters.xlsx",
-          "--model=Mass-activity-at-1.43V+slope-relative-to-Ru",
-          "--PCA_dim_select_method=assigned",
-          "--num_restarts=15",
-          "--PCA_dim=18",
-          "--ker_lengthscale_upper=10",
-          "--bs=1024",
-          "--q_num=7",
-          "--mc_samples_num=1024",
-          "--data_search_space=data/SearchSpace_3elems_Ru0.9.pkl",
-          "--use_y_norm",
-          "--is_MOBO",
-          "--use_MI_filter",
-          "--use_Xnorm_afterPCA",
-        ],      
-        "program": "PCE_analysis.py",
-        "console": "integratedTerminal",
-        "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
-      }
+     
     ]
   }
