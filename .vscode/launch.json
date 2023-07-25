@@ -31,7 +31,7 @@
           "--cuda_visible_devices=2,",
           "--t=4096",
           "--nb_iter=40",
-          "--eps=0.06",
+          "--eps=0.0315",
         ],      
         "program": "generate_attack_NT.py",
         "justMyCode": false,

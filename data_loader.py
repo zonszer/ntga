@@ -89,7 +89,6 @@ def fetch_dataloader(params):
                                                 download=True, transform=train_transformer)
         devset = torchvision.datasets.CIFAR10(root=CIFAR10_path, train=False,
                                               download=True, transform=dev_transformer)
-    
     # ************************************************************************************
     elif params.dataset == 'cifar100':
         trainset = torchvision.datasets.CIFAR100(root=CIFAR100_path, train=True,
@@ -97,7 +96,6 @@ def fetch_dataloader(params):
         devset = torchvision.datasets.CIFAR100(root=CIFAR100_path,
                                                train=False,
                                                download=True, transform=dev_transformer)
-
     # ************************************************************************************
     elif params.dataset == 'tiny_imagenet':
         mean = [0.4802, 0.4481, 0.3975]

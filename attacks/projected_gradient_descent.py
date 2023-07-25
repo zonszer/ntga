@@ -82,7 +82,7 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
                     model_fn = model_fn, 
                     kernel_fn = kernel_fn, 
                     grads_fn = grads_fn, 
-                    x_train = x_train, 
+                    x_train = adv_x, 
                     y_train = y_train, 
                     x_test = x_test, 
                     y_test = y_test, 
@@ -103,7 +103,7 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
         eta = clip_eta(eta, norm, eps)  #先adv_x=eta + X, 后clip adv_x，再clip eta, 最终得到adv_x
         adv_x = x + eta
 
-        # Redo the clipping.
+        # Redo the clipping.    
         # FGM already did it, but subtracting and re-adding eta can add some
         # small numerical error.
         if clip_min is not None or clip_max is not None:
