@@ -21,7 +21,7 @@ parser.add_argument('--cuda_visible_devices', default="2", help='''specify which
 parser.add_argument('--val_size', type=int, default=10000, help="size of validation data")
 parser.add_argument('--t', type=int, default=64, help="time step used to compute poisoned data")
 parser.add_argument('--nb_iter', type=int, default=10, help="number of iteration used to generate poisoned data")
-parser.add_argument('--block_size', type=int, default=512, help="block size of B-NTGA")
+parser.add_argument('--block_size', type=int, default=1024, help="block size of B-NTGA")
 parser.add_argument('--batch_size', type=int, default=128, help="batch size, refer to batch size of test set when making poison data")
 parser.add_argument('--seed', type=int, default=0, help='random seed (default: 0)')
 
