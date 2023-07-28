@@ -11,6 +11,27 @@ import csv
 import torch
 from typing import List
 
+def slice_idxlist(start, end, array_length):
+    """
+    Returns two lists of indices for the main slice and the remaining slice.
+    The main slice contains indices from start to end, wrapping around the array if necessary.
+    The remaining slice contains all other indices.
+
+    Args:
+    start (int): Start index of the main slice.
+    end (int): End index of the main slice.
+    array_length (int): Length of the array to be sliced.
+
+    Returns:
+    tuple: A tuple containing two lists of indices (main_slice_indices, remaining_slice_indices).
+    """
+
+    main_slice_indices = [i % array_length for i in range(start, end)]
+    remaining_slice_indices = [i % array_length for i in range(end, start + array_length)]
+
+    return main_slice_indices, remaining_slice_indices
+
+
 def write_dict_to_csv(data: dict, file_path):
     with open(file_path, 'a', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=data.keys())

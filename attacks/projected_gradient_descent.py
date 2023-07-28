@@ -3,7 +3,7 @@ from attacks.utils import clip_eta, one_hot
 from attacks.fast_gradient_method import fast_gradient_method
 import torch
 
-def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t=None, 
+def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_remain, x_remain, x_train_target, t=None, 
                                loss=None, fx_train_0=0., fx_test_0=0., eps=None, eps_iter=None, 
                                nb_iter=None, norm=None, clip_min=None, clip_max=None, targeted=False, 
                                rand_init=None, rand_minmax=0.3, key=None, batch_size=None,
@@ -83,9 +83,9 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
                     kernel_fn = kernel_fn, 
                     grads_fn = grads_fn, 
                     x_train = adv_x, 
-                    y_train = y_train, 
-                    x_test = x_test, 
-                    y_test = y_test, 
+                    y_remain = y_remain, 
+                    x_remain = x_remain, 
+                    x_train_target = x_train_target, 
                     t = t, 
                     loss = loss,
                     fx_train_0 = fx_train_0, 

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import jax.numpy as np
 from attacks.utils import one_hot
+import jax
 
-
-def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t=None, 
+def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_remain, x_remain, x_train_target, t=None, 
                          loss=None, fx_train_0=0., fx_test_0=0., eps=None, norm=None, 
                          clip_min=None, clip_max=None, targeted=False, batch_size=None,
                          T=None):
@@ -58,10 +58,14 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test
     grads = 0
 
     # for i in range(int(len(x_test)/batch_size)):  #TODO: 是不是这里最好还是有cycle比较好（取所有测试集中所有标签相同的图的logits，拟合其分布？）
+    # x_train = jax.device_put(x_train, jax.devices()[1])
+    # x_remain = jax.device_put(x_remain, jax.devices()[1])
+    # y_remain = jax.device_put(y_remain, jax.devices()[1])
+    # x_train_target = jax.device_put(x_train_target, jax.devices()[1])
     batch_grads = grads_fn(x_train,
-                            x_test,     #   X_test.shape != X_train.shape
-                            y_train,
-                            y_test,
+                            x_remain,     #   X_test.shape != X_train.shape
+                            y_remain,
+                            x_train_target,
                             kernel_fn,
                             loss,
                             t,   #!t is used to compute poisoned data

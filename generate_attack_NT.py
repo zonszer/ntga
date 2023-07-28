@@ -18,6 +18,7 @@ import datetime
 import os, logging
 import jax.numpy as jnp
 import numpy as np
+from random import sample
 from jax.api import grad, jit, vmap
 import jax
 from jax import random
@@ -96,7 +97,7 @@ def surrogate_fn(fn_model_type, W_std, b_std, num_classes, dataset):
     return init_fn, apply_fn, kernel_fn
 
 
-def model_fn(kernel_fn, x_train=None, x_test=None, fx_train_0=0., fx_test_0=0., t=None, y_train=None, diag_reg=1e-4):
+def model_fn(kernel_fn, x_train=None, x_remain=None, fx_train_0=0., fx_test_0=0., t=None, y_remain=None, diag_reg=1e-4):
     """
     :param kernel_fn: a callable that takes an input tensor and returns the kernel matrix.
     :param x_train: input tensor (training data).
@@ -119,13 +120,13 @@ def model_fn(kernel_fn, x_train=None, x_test=None, fx_train_0=0., fx_test_0=0., 
     """
     # Kernel
     # ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #out shape:(512, 512)
-    ntk_test_test = kernel_fn(x_test, x_test, 'ntk')    #out shape:(512, 512)
-    ntk_test_train = kernel_fn(x_train, x_test, 'ntk')      #shape=(30, 512)  #changed 1:
+    ntk_remain_remain = kernel_fn(x_remain, x_remain, 'ntk')    #out shape:(512, 512)
+    ntk_train_remain = kernel_fn(x_train, x_remain, 'ntk')      #shape=(30, 512)  #changed 1:
     # ntk_test_train = kernel_fn(x_test, x_train, 'ntk')  #what is the meaning of test_train here? x_test.shape=(10000, 3072)
     ##ntk_train_train.shape=(512, 512), ntk_test_train.shape=(10000, 512)
     # Prediction
-    predict_fn = nt.predict.gradient_descent_mse(ntk_test_test, y_train, diag_reg=diag_reg)
-    return predict_fn(t, fx_train_0, fx_test_0, ntk_test_train) #fx_test_0=0， t=none
+    predict_fn = nt.predict.gradient_descent_mse(ntk_remain_remain, y_remain, diag_reg=diag_reg)
+    return predict_fn(t, fx_train_0, fx_test_0, ntk_train_remain) #fx_test_0=0， t=none
 
 
 def kl_divergence_loss_with_temperature(output_stu, output_tch, T, reduction='batchmean'):
@@ -138,24 +139,25 @@ def kl_divergence_loss_with_temperature(output_stu, output_tch, T, reduction='ba
     kl_loss = kl_loss * (T * T)
     return kl_loss.mean()
 
-def NT_loss(x_train, x_test, y_train, y_test, kernel_fn, loss='KL', t=None, T=None, targeted=True, diag_reg=1e-4):
+def NT_loss(x_train, x_remain, y_remain, x_train_target, kernel_fn, loss='KL', t=None, T=None, targeted=True, diag_reg=1e-4):
     # Kernel
     # ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #out shape:(512, 512)
-    ntk_test_test = kernel_fn(x_test, x_test, 'ntk')    #out shape:(512, 512)
-    ntk_test_train = kernel_fn(x_train, x_test, 'ntk')      #shape=(30, 512)  #changed 1:
+    ntk_remain_remain = kernel_fn(x_remain, x_remain, 'ntk')    #out shape:(512, 512)
+    ntk_train_remain = kernel_fn(x_train, x_remain, 'ntk')      #shape=(30, 512)  #changed 1:
     
     # Prediction    #why not use gradient_descent_mse_ensemble?
     #y_train.shape is (512, 10)
-    predict_fn = nt.predict.gradient_descent_mse(ntk_test_test, y_train, diag_reg=diag_reg)   #need change here TODO #maybe changed 1.5?
-    fx = predict_fn(t, 0., 0., ntk_test_train)[1]       #changed 2: t is time when poision occurs, also equals time step used to compute poisoned data
+    predict_fn = nt.predict.gradient_descent_mse(ntk_remain_remain, y_remain, diag_reg=diag_reg)
+
+    fx = predict_fn(t, 0., 0., ntk_train_remain)[1]       #changed 2: t is time when poision occurs, also equals time step used to compute poisoned data
     # what zero means? A:  predict_fn(t, fx_train_0, fx_test_0, k_test_train)
 
     if loss=='KL':
-        loss = kl_divergence_loss_with_temperature(fx, y_test, T)   
+        loss = kl_divergence_loss_with_temperature(fx, x_train_target, T)   
     elif loss == 'cross-entropy':
-        loss = cross_entropy_loss(fx, y_test)   #fx is predicted logits, y_test.shape=(30, 10), fx.shape=(30, 10)
+        loss = cross_entropy_loss(fx, x_train_target)   #fx is predicted logits, y_test.shape=(30, 10), fx.shape=(30, 10)
     elif loss == 'mse':
-        loss = mse_loss(fx, y_test)
+        loss = mse_loss(fx, x_train_target)
    
     return -loss    #always targeted
 
@@ -216,7 +218,7 @@ def get_model(params, num_class):
 
     model = model.to(args.device)
 
-    if len(eval(args.cuda_visible_devices)) > 1:
+    if len(eval(args.cuda_visible_devices)) > 2:
         model = nn.DataParallel(model, device_ids=device_ids)
         adversarial_model = nn.DataParallel(adversarial_model, device_ids=device_ids)
 
@@ -288,28 +290,32 @@ def main(args):
     y_train_adv = []
     loss_diff_list = []
     for idx in tqdm(range(epoch)):
-        _x_train = x_train_all[idx*args.block_size:(idx+1)*args.block_size]
-        _y_train = y_train_all[(idx+1)*args.block_size:(idx+2)*args.block_size]
-        _y_target = y_target_all[idx*args.block_size:(idx+1)*args.block_size]
-        _x_test = x_train_all[(idx+1)*args.block_size:(idx+2)*args.block_size]
+        start = (idx)*args.block_size  
+        end = (idx+1)*args.block_size
+        slice, slice_remain = slice_idxlist(start, end, len(x_train_all))
+        slice, slice_remain = jnp.array(slice), jnp.array(slice_remain[:5120])   #sample(slice_remain, 6656)
+        _x_train = x_train_all[slice]
+        _x_train_target = y_target_all[slice]
+        _x_remain = x_train_all[slice_remain]
+        _y_remain = y_train_all[slice_remain]
         _x_train_adv = projected_gradient_descent(model_fn=model_fn, kernel_fn=kernel_fn, grads_fn=grads_fn, 
-                                                  x_train=_x_train, y_train=_y_train, 
-                                                  x_test=_x_test, y_test=_y_target, 
+                                                  x_train=_x_train, 
+                                                  x_train_target=_x_train_target, 
+                                                  y_remain=_y_remain, x_remain=_x_remain, 
                                                   t=args.t, loss='KL', eps=args.eps, eps_iter=args.eps_iter, 
                                                   nb_iter=args.nb_iter, clip_min=0, clip_max=1, batch_size=args.batch_size,
                                                   T=args.T, norm=eval(args.norm_type))
         x_train_adv.append(_x_train_adv)
-        y_train_adv.append(_y_train)
+        y_train_adv.append(_y_remain)
 
         # Performance of clean and poisoned data
-        _, y_pred1 = model_fn(kernel_fn=kernel_fn, x_train=_x_train, x_test=_x_test, y_train=_y_train)
-        logger.log(logging.INFO, "_x_train Acc on clean data: {:.4f}".format(accuracy(y_pred1, _y_target)))
-        _, y_pred2 = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], x_test=_x_test, y_train=y_train_adv[-1])
-        logger.log(logging.INFO, "_x_train Acc on NTGA posion data: {:.4f}".format(accuracy(y_pred2, _y_target)))
-        loss_diff = kl_divergence_loss_with_temperature(y_pred1, _y_target, T=4.0) -  kl_divergence_loss_with_temperature(y_pred2, _y_target, T=4.0)
-        logger.log(logging.INFO, "loss_diff of clean_data - pos_data = {:.4f}".format(loss_diff), color="BLUE")
+        _, y_pred1 = model_fn(kernel_fn=kernel_fn, x_train=_x_train, x_remain=_x_remain, y_remain=_y_remain)
+        logger.log(logging.INFO, "_x_train Acc on clean data: {:.4f}".format(accuracy(y_pred1, _x_train_target)))
+        _, y_pred2 = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], x_remain=_x_remain, y_remain=y_train_adv[-1])
+        logger.log(logging.INFO, "_x_train Acc on NTGA posion data: {:.4f}".format(accuracy(y_pred2, _x_train_target)))
+        loss_diff = kl_divergence_loss_with_temperature(y_pred1, _x_train_target, T=4.0) - kl_divergence_loss_with_temperature(y_pred2, _x_train_target, T=4.0)
+        logger.log(logging.INFO, f"EPOCH {idx}: loss_diff of clean_data - pos_data = {loss_diff:.4f}", color="BLUE")
         loss_diff_list.append(loss_diff)
-        
 
     # Save poisoned data
     x_train_adv = jnp.concatenate(x_train_adv)

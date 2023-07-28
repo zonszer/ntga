@@ -209,9 +209,9 @@ def main():
     for idx in tqdm(range(epoch)):
         _x_train = x_train[idx*args.block_size:(idx+1)*args.block_size]
         _y_train = y_train[idx*args.block_size:(idx+1)*args.block_size]
-        _x_test = x_test[idx*args.block_size:(idx+1)*args.block_size]
+        _x_remain = x_test[idx*args.block_size:(idx+1)*args.block_size]
         _x_train_adv = projected_gradient_descent(model_fn=model_fn, kernel_fn=kernel_fn, grads_fn=grads_fn, 
-                                                  x_train=_x_train, y_train=_y_train, x_test=_x_test, y_test=y_val, 
+                                                  x_train=_x_train, y_remain=_y_train, x_remain=_x_remain, x_train_target=y_val, 
                                                   t=args.t, loss='KL', eps=args.eps, eps_iter=eps_iter, 
                                                   nb_iter=args.nb_iter, clip_min=0, clip_max=1, batch_size=args.batch_size)
 
