@@ -7,7 +7,8 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_remain,
                                loss=None, fx_train_0=0., fx_test_0=0., eps=None, eps_iter=None, 
                                nb_iter=None, norm=None, clip_min=None, clip_max=None, targeted=False, 
                                rand_init=None, rand_minmax=0.3, key=None, batch_size=None,
-                               T=None):
+                               T=None,
+                               y_train=None):
     """
     This code is based on CleverHans library(https://github.com/cleverhans-lab/cleverhans).
     This class implements either the Basic Iterative Method
@@ -97,6 +98,7 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_remain,
                     targeted = targeted, 
                     batch_size = batch_size,
                     T = T,
+                    y_train = y_train,
                 )
         # Clipping perturbation eta to norm norm ball
         eta = adv_x - x
@@ -108,5 +110,5 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_remain,
         # small numerical error.
         if clip_min is not None or clip_max is not None:
             adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
-            
+    
     return adv_x

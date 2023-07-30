@@ -2,11 +2,13 @@
 import jax.numpy as np
 from attacks.utils import one_hot
 import jax
+from utils.utils_ import slice_idxlist
 
 def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_remain, x_remain, x_train_target, t=None, 
                          loss=None, fx_train_0=0., fx_test_0=0., eps=None, norm=None, 
                          clip_min=None, clip_max=None, targeted=False, batch_size=None,
-                         T=None):
+                         T=None,
+                         y_train=None):
     """
     This code is based on CleverHans library(https://github.com/cleverhans-lab/cleverhans).
     JAX implementation of the Fast Gradient Method.
@@ -50,28 +52,32 @@ def fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_remain, x_rem
     # if y_test is None: 
         # Using model predictions as ground truth to avoid label leaking
         # y_test = get_NTmodel_pred()
-        ##maybe need to transform to values that all sum to 1 TODO:
+        ##maybe need to transform to values that all sum to 1 
         
     # Objective function - Θ(test, train)Θ(train, train)^-1(1-e^{-eta*t*Θ(train, train)})y_train
     if batch_size is None:
         batch_size = x_train.shape[0]   
     grads = 0
 
-    # for i in range(int(len(x_test)/batch_size)):  #TODO: 是不是这里最好还是有cycle比较好（取所有测试集中所有标签相同的图的logits，拟合其分布？）
     # x_train = jax.device_put(x_train, jax.devices()[1])
     # x_remain = jax.device_put(x_remain, jax.devices()[1])
     # y_remain = jax.device_put(y_remain, jax.devices()[1])
     # x_train_target = jax.device_put(x_train_target, jax.devices()[1])
-    batch_grads = grads_fn(x_train,
-                            x_remain,     #   X_test.shape != X_train.shape
-                            y_remain,
-                            x_train_target,
-                            kernel_fn,
-                            loss,
-                            t,   #!t is used to compute poisoned data
-                            T) #主要还是不知道它grad ascent是咋实现？A: +grad 为ascent, -grad为descent
-    grads += batch_grads    #!cumulative sum of all batches in test set
-
+    cycle = x_remain.shape[0]//batch_size + 1   
+    for i in range(cycle):
+        start = (i)*batch_size
+        end = (i+1)*batch_size
+        slice = np.array([j % len(x_remain) for j in range(start, end)])
+        batch_grads = grads_fn(x_train,
+                                y_train,
+                                x_remain[slice],     #   X_test.shape != X_train.shape
+                                y_remain[slice],
+                                x_train_target,
+                                kernel_fn,
+                                loss,
+                                t,   #!t is used to compute poisoned data
+                                T) #主要还是不知道它grad ascent是咋实现？A: +grad 为ascent, -grad为descent
+        grads += batch_grads    #!cumulative sum of all batches in test set
 
     axis = list(range(1, len(grads.shape)))
     avoid_zero_div = 1e-12

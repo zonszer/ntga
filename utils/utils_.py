@@ -10,8 +10,24 @@ from glob import glob
 import csv
 import torch
 from typing import List
+import jax.numpy as jnp
 
-def slice_idxlist(start, end, array_length):
+def restore_pic(x):
+    """
+    A function to restore image data from a normalized and rearranged format back to its original format.
+    Parameters:
+        x (numpy array) : The input image data. Shape is (batch x C x H x W) and values are in range [0,1]
+    Returns:
+        numpy array : The restored image. Shape is (H x W x C) and values are in range [0,255]
+    """
+    x = x * 255
+    x = jnp.round(x)
+    x = x.astype(jnp.uint8)
+    x = jnp.transpose(x, (0, 2, 3, 1))
+    return x
+
+
+def slice_idxlist(start, end, array_length, need_slice_remain=True):
     """
     Returns two lists of indices for the main slice and the remaining slice.
     The main slice contains indices from start to end, wrapping around the array if necessary.

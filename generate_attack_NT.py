@@ -11,7 +11,7 @@ from utils import logger, file_saver
 from utils.utils_ import *
 from data_loader import fetch_dataloader
 from models import *
-from utils.utils_jax_ import _flatten, _Kernel, Kernel, NTKernel, wrap, fixed_point, qc_map
+from utils.utils_jax_ import _flatten, _Kernel, Kernel, NTKernel, wrap, fixed_point, qc_map, cross_entropy_loss
 
 import pandas as pd
 import datetime
@@ -139,7 +139,8 @@ def kl_divergence_loss_with_temperature(output_stu, output_tch, T, reduction='ba
     kl_loss = kl_loss * (T * T)
     return kl_loss.mean()
 
-def NT_loss(x_train, x_remain, y_remain, x_train_target, kernel_fn, loss='KL', t=None, T=None, targeted=True, diag_reg=1e-4):
+def NT_loss(x_train, y_train, x_remain, y_remain, x_train_target, kernel_fn, 
+            loss=None, t=None, T=None, w=0.2, targeted=True, diag_reg=1e-4):
     # Kernel
     # ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #out shape:(512, 512)
     ntk_remain_remain = kernel_fn(x_remain, x_remain, 'ntk')    #out shape:(512, 512)
@@ -153,12 +154,16 @@ def NT_loss(x_train, x_remain, y_remain, x_train_target, kernel_fn, loss='KL', t
     # what zero means? A:  predict_fn(t, fx_train_0, fx_test_0, k_test_train)
 
     if loss=='KL':
-        loss = kl_divergence_loss_with_temperature(fx, x_train_target, T)   
+        loss = kl_divergence_loss_with_temperature(fx, x_train_target, T)  
+    elif loss=='KL+':
+        loss = kl_divergence_loss_with_temperature(fx, x_train_target, T) + w*cross_entropy_loss(fx, y_train)
     elif loss == 'cross-entropy':
         loss = cross_entropy_loss(fx, x_train_target)   #fx is predicted logits, y_test.shape=(30, 10), fx.shape=(30, 10)
     elif loss == 'mse':
         loss = mse_loss(fx, x_train_target)
-   
+    else:
+        raise TypeError 
+
     return -loss    #always targeted
 
 
@@ -224,9 +229,15 @@ def get_model(params, num_class):
 
     return model
 
-def get_y_traget(x_train_all, model, sparse_ratio, ST_model_path='resnet18_normal.tar'):
-    checkpoint = torch.load(ST_model_path)
-    logger.log(logging.INFO, f'- Load pretrained NT/ST model from {ST_model_path}')
+def get_y_traget(x_train_all, model, sparse_ratio, id):
+    if 'ST' in id:
+        model_path = 'resnet18_normal.tar'
+    elif 'NT' in id:
+        model_path = 'resnet18_nasty.tar'
+    else:
+        raise TypeError
+    checkpoint = torch.load(model_path)
+    logger.log(logging.INFO, f'- Load pretrained NT/ST model from {model_path}')
     try:
         model.load_state_dict(checkpoint['state_dict'], strict=True)
     except KeyError:
@@ -234,12 +245,12 @@ def get_y_traget(x_train_all, model, sparse_ratio, ST_model_path='resnet18_norma
 
     model.eval()
     bs = 512
-    y_target_all = []
+    y_target_all = []zjh
     with torch.no_grad():
         for i in range(int(x_train_all.shape[0]//bs + 1)):
             y_target = model(x_train_all[i*bs: (i+1)*bs])
-            if 'normal' in ST_model_path or 'stingy' in ST_model_path:
-                logger.log(logging.INFO, f'create corresponding sparse logits for {ST_model_path}', color='BLUE')
+            if 'normal' in model_path or 'stingy' in model_path:
+                logger.log(logging.INFO, f'create corresponding sparse logits for {model_path}', color='BLUE')
                 y_target = create_sparse_logits(y_target, sparse_ratio)
             y_target_all.append(y_target)
         y_target_all = torch.cat(y_target_all, dim=0)
@@ -254,17 +265,48 @@ def create_sparse_logits(logits, sparse_ratio=None):
     logits_sparse[row, index] = value
     return logits_sparse
 
+def get_performance(epoch_idx, kernel_fn, x_train, y_train, x_remain, y_remain, x_train_target,
+                    x_train_adv, y_train_adv):
+    loss_diff_list = [] 
+    pred_clean_list = []
+    pred_adv_list = []
+    batch_size = args.batch_size
+    for i in range(len(x_remain)//batch_size):
+        _, y_pred1 = model_fn(kernel_fn=kernel_fn, x_train=x_train, 
+                              x_remain=x_remain[batch_size*i:batch_size*(i+1)], y_remain=y_remain[batch_size*i:batch_size*(i+1)])
+        acc1 = accuracy(y_pred1, x_train_target)
+
+        _, y_pred2 = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], 
+                              x_remain=x_remain[batch_size*i:batch_size*(i+1)], y_remain=y_remain[batch_size*i:batch_size*(i+1)])
+        acc2 = accuracy(y_pred2, x_train_target)
+
+        loss_diff = kl_divergence_loss_with_temperature(y_pred1, x_train_target, T=4.0) - \
+                    kl_divergence_loss_with_temperature(y_pred2, x_train_target, T=4.0)
+
+        loss_diff_list.append(loss_diff)
+        pred_clean_list.append(acc1)
+        pred_adv_list.append(acc2)
+
+    loss, pred_clean, pred_adv = jnp.array(loss_diff_list).mean(), jnp.array(pred_clean_list).mean(), jnp.array(pred_adv_list).mean()
+
+    logger.log(logging.INFO, "_x_train Acc on clean data: {:.4f}".format(pred_clean))
+    logger.log(logging.INFO, "_x_train Acc on NTGA posion data: {:.4f}".format(pred_adv))
+    logger.log(logging.INFO, f"EPOCH {epoch_idx}: loss = {kl_divergence_loss_with_temperature(y_pred1, x_train_target, T=4.0):.4f}, "
+                             f"loss_diff = {loss:.4f}", color="BLUE")
+    return loss, pred_clean, pred_adv
+
 
 def main(args):
     # Load training and test data
     # data = ld_cifar10()
     model_T = get_model(args, num_class=args.num_classes)
-    train_loader, test_loader = fetch_dataloader(args)
+    train_loader, test_loader = fetch_dataloader(deepcopy(args))
     x_train_all, y_train_all = next(iter(train_loader)) #a, b =next(iter(test_loader))
     y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes).double()
     y_target_all = get_y_traget(x_train_all=x_train_all.to(args.device),
                                  model=model_T, 
-                                 sparse_ratio=args.sparse_ratio) 
+                                 sparse_ratio=args.sparse_ratio,
+                                 id=args.id) 
     x_train_all = train_loader.dataset.invtransformer(x_train_all)
     torch.cuda.empty_cache()
 
@@ -281,45 +323,47 @@ def main(args):
     
     # grads_fn: a callable that takes an input tensor and a loss function, 
     # and returns the gradient w.r.t. an input tensor.
-    grads_fn = jit(grad(NT_loss, argnums=0), static_argnums=(4, 5, 7))
+    grads_fn = jit(grad(NT_loss, argnums=0), static_argnums=(5, 6, 8))
     
     # Generate Neural Tangent Generalization Attacks (NTGA)
     logger.log(logging.INFO, "Generating NTGA....")
-    epoch = x_train_all.shape[0]//args.block_size + 1   #what is block_size? maybe similar to batch_size
     x_train_adv = []
     y_train_adv = []
-    loss_diff_list = []
+    loss_list = []  #for recording
+    pred_clean_list = []
+    pred_adv_list = []
+    epoch = x_train_all.shape[0]//args.block_size + 1   #what is block_size? maybe similar to batch_size
     for idx in tqdm(range(epoch)):
         start = (idx)*args.block_size  
         end = (idx+1)*args.block_size
         slice, slice_remain = slice_idxlist(start, end, len(x_train_all))
-        slice, slice_remain = jnp.array(slice), jnp.array(slice_remain[:5120])   #sample(slice_remain, 6656)
+        slice, slice_remain = jnp.array(slice), jnp.array(slice_remain)   #sample(slice_remain, 6656)
         _x_train = x_train_all[slice]
+        _y_train = y_train_all[slice]
         _x_train_target = y_target_all[slice]
         _x_remain = x_train_all[slice_remain]
         _y_remain = y_train_all[slice_remain]
         _x_train_adv = projected_gradient_descent(model_fn=model_fn, kernel_fn=kernel_fn, grads_fn=grads_fn, 
-                                                  x_train=_x_train, 
+                                                  x_train=_x_train, y_train=_y_train,
                                                   x_train_target=_x_train_target, 
                                                   y_remain=_y_remain, x_remain=_x_remain, 
-                                                  t=args.t, loss='KL', eps=args.eps, eps_iter=args.eps_iter, 
+                                                  t=args.t, loss=args.loss, eps=args.eps, eps_iter=args.eps_iter, 
                                                   nb_iter=args.nb_iter, clip_min=0, clip_max=1, batch_size=args.batch_size,
                                                   T=args.T, norm=eval(args.norm_type))
         x_train_adv.append(_x_train_adv)
-        y_train_adv.append(_y_remain)
+        y_train_adv.append(_y_train)
 
         # Performance of clean and poisoned data
-        _, y_pred1 = model_fn(kernel_fn=kernel_fn, x_train=_x_train, x_remain=_x_remain, y_remain=_y_remain)
-        logger.log(logging.INFO, "_x_train Acc on clean data: {:.4f}".format(accuracy(y_pred1, _x_train_target)))
-        _, y_pred2 = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], x_remain=_x_remain, y_remain=y_train_adv[-1])
-        logger.log(logging.INFO, "_x_train Acc on NTGA posion data: {:.4f}".format(accuracy(y_pred2, _x_train_target)))
-        loss_diff = kl_divergence_loss_with_temperature(y_pred1, _x_train_target, T=4.0) - kl_divergence_loss_with_temperature(y_pred2, _x_train_target, T=4.0)
-        logger.log(logging.INFO, f"EPOCH {idx}: loss_diff of clean_data - pos_data = {loss_diff:.4f}", color="BLUE")
-        loss_diff_list.append(loss_diff)
+        loss, pred_clean, pred_adv = get_performance(epoch_idx=idx, kernel_fn=kernel_fn, y_train=_y_train,
+                                        x_train=_x_train, x_remain=_x_remain, y_remain=_y_remain, x_train_target=_x_train_target,
+                                        x_train_adv=x_train_adv, y_train_adv=y_train_adv)
+        loss_list.append(loss)
+        pred_clean_list.append(pred_clean)
+        pred_adv_list.append(pred_adv)
 
     # Save poisoned data
-    x_train_adv = jnp.concatenate(x_train_adv)
-    y_train_adv = jnp.concatenate(y_train_adv)
+    x_train_adv = jnp.concatenate(x_train_adv)[:x_train_all.shape[0]]   #get pData with the same size of the original
+    y_train_adv = jnp.concatenate(y_train_adv)[:y_train_all.shape[0]]
     
     if args.dataset == "mnist":
         x_train_adv = x_train_adv.reshape(-1, 1, 28, 28)
@@ -333,6 +377,8 @@ def main(args):
     save_path = pjoin(args.save_path, args.dataset)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
+
+    x_train_adv = restore_pic(x_train_adv)
     jnp.save('{:s}/x_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(save_path, args.dataset, args.fn_model_type, args.id), 
              x_train_adv)
     # jnp.save('{:s}/y_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(save_path, args.dataset, args.fn_model_type, args.id),
@@ -340,9 +386,10 @@ def main(args):
     jnp.save('{:s}/y_train_{:s}_ntga_{:s}_id-{:s}.npy'.format(save_path, args.dataset, args.fn_model_type, args.id),
               jnp.argmax(y_train_adv, axis=1))
     
-    logger.log(logging.INFO, "Avg loss_diff = {:.7f}".format(jnp.array(loss_diff_list).mean()), color="BLUE")
+    logger.log(logging.INFO, "Avg loss_diff = {:.7f}".format(jnp.array(loss_list).mean()), color="BLUE")
+    logger.log(logging.INFO, "Avg pred_clean data = {:.7f}".format(jnp.array(pred_clean_list).mean()), color="BLUE")
+    logger.log(logging.INFO, "Avg pred_adv data = {:.7f}".format(jnp.array(pred_adv_list).mean()), color="BLUE")
     logger.log(logging.INFO, "================== Successfully generate NTGA! ==================")
-
 
 def add_args(args):
     os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_visible_devices  #env must be set before torch.cude is called for the first time

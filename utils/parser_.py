@@ -13,6 +13,7 @@ parser.add_argument('--fn_model_type', default='cnn', help='surrogate model. Cho
 parser.add_argument('--teacher_model_name', default='resnet18', help='teacher model. Choose either `resnet18` or `resnet50`')
 parser.add_argument('--dataset', required=True, default='cifar10', help="dataset. `mnist`, `cifar10`, and `imagenet` are available. For ImageNet or other dataset, please modify the path in the code directly.")
 parser.add_argument('--save_path', default="./data", help="path to save poisoned data")
+parser.add_argument('--loss', default="KL", help="loss type")
 parser.add_argument('--norm_type', default="np.inf", help="norm type. Choose either `np.inf` or `2`")
 parser.add_argument('--cuda_visible_devices', default="2", help='''specify which GPU to run an application on,
                                                                 example: '0,' or "0,1" ''')
