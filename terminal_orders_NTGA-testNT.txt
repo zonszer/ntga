@@ -37,7 +37,13 @@ python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-inf --fn_model_type=
 
 python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-inf1 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=4096 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.03125 --batch_size=5120 	(: add cycle of batch_size
 
-python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-inf1-t1024-sp01 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(TODO: test sparse_ratio=0.1 
+python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-inf1-t1024-sp01 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(: test sparse_ratio=0.1 + t=1024
+
+python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-sp01sec --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(TODO: test secod max as targeted_y
+
+python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t1024-sp01 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=1024 --nb_iter=20 --norm_type=2 --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL 	(TODO: test norm_type=2
+
+python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t512-sp01 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=512 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(TODO: test sp01 with t=512
 
 ===============Nasty teacher 
 
@@ -46,11 +52,11 @@ python -utt generate_attack_NT.py --id=test_NT_Pdata-eps06 --fn_model_type=fnn -
 new_train test split:
 python -utt generate_attack_NT.py --id=PdataNT-eps03-iter20-inf1 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=4096 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --step_size=1.1 --eps=0.03125 --batch_size=5120 	(
 
-python -utt generate_attack_NT.py --id=PdataNT-eps03-iter20-inf1-KL+w02 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=4096 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL+ (TODO: test KL+ loss with w=0.2 
-
 python -utt generate_attack_NT.py --id=PdataNT-eps03-iter20-inf1-KL+t1024 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL+	(: test t = 1024 with loss KL+
 
 python -utt generate_attack_NT.py --id=PdataNT-eps03-iter20-inf1-t1024 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(: test t = 1024 with loss KL
+
+python -utt generate_attack_NT.py --id=PdataNT-eps03-iter20-inf1-KL+w02 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.2 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL+ (: test KL+ loss with w=0.2  + t=1024
 
 
 

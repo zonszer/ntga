@@ -245,7 +245,7 @@ def get_y_traget(x_train_all, model, sparse_ratio, id):
 
     model.eval()
     bs = 512
-    y_target_all = []zjh
+    y_target_all = []
     with torch.no_grad():
         for i in range(int(x_train_all.shape[0]//bs + 1)):
             y_target = model(x_train_all[i*bs: (i+1)*bs])
@@ -263,6 +263,16 @@ def create_sparse_logits(logits, sparse_ratio=None):
     logits_sparse = torch.full(logits.shape, float("-inf")).to(logits.device)
     row = torch.tensor([[i] * num_keep for i in range(index.shape[0])]).to(logits.device)
     logits_sparse[row, index] = value
+    return logits_sparse
+
+def create_sparse_logits_sec(logits, sparse_ratio=None):
+    num_keep = int(sparse_ratio * logits.shape[1])
+    _, indices = torch.topk(logits, k=num_keep + 1, dim=1)  # Retrieve num_keep + 1 indices
+    row_indices = torch.arange(logits.shape[0]).unsqueeze(1).to(logits.device)
+    second_max_indices = indices[:, 1]  # Select the second maximum index
+
+    logits_sparse = torch.full(logits.shape, float("-inf")).to(logits.device)
+    logits_sparse[row_indices, second_max_indices] = logits[row_indices, second_max_indices]
     return logits_sparse
 
 def get_performance(epoch_idx, kernel_fn, x_train, y_train, x_remain, y_remain, x_train_target,
