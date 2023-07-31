@@ -1,14 +1,12 @@
 import jax.numpy as np
 from attacks.utils import clip_eta, one_hot
 from attacks.fast_gradient_method import fast_gradient_method
-import torch
 
-def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_remain, x_remain, x_train_target, t=None, 
-                               loss=None, fx_train_0=0., fx_test_0=0., eps=None, eps_iter=None, 
-                               nb_iter=None, norm=None, clip_min=None, clip_max=None, targeted=False, 
-                               rand_init=None, rand_minmax=0.3, key=None, batch_size=None,
-                               T=None,
-                               y_train=None):
+
+def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t=None, 
+                               loss='cross-entropy', fx_train_0=0., fx_test_0=0., eps=0.3, eps_iter=0.03, 
+                               nb_iter=10, norm=np.inf, clip_min=None, clip_max=None, targeted=False, 
+                               rand_init=None, rand_minmax=0.3, key=None, batch_size=None):
     """
     This code is based on CleverHans library(https://github.com/cleverhans-lab/cleverhans).
     This class implements either the Basic Iterative Method
@@ -50,7 +48,7 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_remain,
             Targeted will instead try to move in the direction of being more like y.
     :return: a tensor for the poisoned data.
     """
-    assert eps_iter <= eps, (eps_iter, eps) #here (eps_iter, eps) is the shown values when assert fails
+    assert eps_iter <= eps, (eps_iter, eps)
     if norm == 1:
         raise NotImplementedError("It's not clear that FGM is a good inner loop"
                                   " step for PGD when norm=1, because norm=1 FGM "
@@ -61,9 +59,10 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_remain,
         raise ValueError("Norm order must be either np.inf or 2.")
         
     x = x_train
-    # if y_test is None:
-        # x_labels = np.argmax(model_fn(kernel_fn, x_train, x_test, fx_train_0, fx_test_0)[1], 1)
-        # y_test = one_hot(x_labels, num_classes)
+    if y_test is None:
+        # Using model predictions as ground truth to avoid label leaking
+        x_labels = np.argmax(model_fn(kernel_fn, x_train, x_test, fx_train_0, fx_test_0)[1], 1)
+        y_test = one_hot(x_labels, num_classes)
         
     # Initialize loop variables
     if rand_init:
@@ -78,37 +77,19 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_remain,
     if clip_min is not None or clip_max is not None:
         adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         
-    for i in range(nb_iter):    #10 iterations for 1 batch which composed of 520 images #Q: 10iter的意义是什么？
-        adv_x = fast_gradient_method(
-                    model_fn = model_fn, 
-                    kernel_fn = kernel_fn, 
-                    grads_fn = grads_fn, 
-                    x_train = adv_x, 
-                    y_remain = y_remain, 
-                    x_remain = x_remain, 
-                    x_train_target = x_train_target, 
-                    t = t, 
-                    loss = loss,
-                    fx_train_0 = fx_train_0, 
-                    fx_test_0 = fx_test_0, 
-                    eps = eps_iter, 
-                    norm = norm, 
-                    clip_min = clip_min, 
-                    clip_max = clip_max,
-                    targeted = targeted, 
-                    batch_size = batch_size,
-                    T = T,
-                    y_train = y_train,
-                )
+    for i in range(nb_iter):    #10 iterations for 1 batch which composed of 520 images
+        adv_x = fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t, loss, 
+                                     fx_train_0, fx_test_0, eps, norm, clip_min, clip_max, targeted, batch_size)
+
         # Clipping perturbation eta to norm norm ball
         eta = adv_x - x
         eta = clip_eta(eta, norm, eps)  #先adv_x=eta + X, 后clip adv_x，再clip eta, 最终得到adv_x
         adv_x = x + eta
 
-        # Redo the clipping.    
+        # Redo the clipping.
         # FGM already did it, but subtracting and re-adding eta can add some
         # small numerical error.
         if clip_min is not None or clip_max is not None:
             adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
-    
+            
     return adv_x
