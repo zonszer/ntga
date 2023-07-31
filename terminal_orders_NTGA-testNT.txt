@@ -39,11 +39,13 @@ python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-inf1 --fn_model_type
 
 python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-inf1-t1024-sp01 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(: test sparse_ratio=0.1 + t=1024
 
-python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-sp01sec --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(TODO: test secod max as targeted_y
+python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-sp01sec --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(: test secod max as targeted_y
 
-python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t1024-sp01 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=1024 --nb_iter=20 --norm_type=2 --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL 	(TODO: test norm_type=2
+python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t1024-sp01 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=1024 --nb_iter=20 --norm_type=2 --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL 	(: test norm_type=2 -> has some problems
 
 python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t512-sp01 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=512 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(TODO: test sp01 with t=512
+
+python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t1024-uniform --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=1024 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL 	(TODO: test uniform logits targeted with ST
 
 ===============Nasty teacher 
 

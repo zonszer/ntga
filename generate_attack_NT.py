@@ -28,7 +28,7 @@ from neural_tangents import stax
 from models.dnn_infinite import DenseGroup
 from models.cnn_infinite import ConvGroup
 import neural_tangents as nt
-from jax.experimental.stax import logsoftmax, softmax
+from jax.experimental.stax import softmax, log_softmax
 import chex
 from copy import deepcopy
 from attacks.projected_gradient_descent import projected_gradient_descent
@@ -132,7 +132,7 @@ def model_fn(kernel_fn, x_train=None, x_remain=None, fx_train_0=0., fx_test_0=0.
 def kl_divergence_loss_with_temperature(output_stu, output_tch, T, reduction='batchmean'):
     '''the stu should mimic the tch output'''
     # jax.debug.print(f'output_stu:\n {output_stu}', ordered=True)
-    log_softmax_stu = logsoftmax(output_stu / T, axis=1)
+    log_softmax_stu = log_softmax(output_stu / T, axis=1)
     softmax_tch = softmax(output_tch / T, axis=1)   
     kl_loss = kl_divergence(log_predictions=log_softmax_stu, targets=softmax_tch)
 
@@ -265,6 +265,10 @@ def create_sparse_logits(logits, sparse_ratio=None):
     logits_sparse[row, index] = value
     return logits_sparse
 
+def create_sparse_logits_uniform(logits, sparse_ratio=None):
+    logits_sparse = torch.full(logits.shape, 1.0/logits.shape[1]).to(logits.device)
+    return logits_sparse
+
 def create_sparse_logits_sec(logits, sparse_ratio=None):
     num_keep = int(sparse_ratio * logits.shape[1])
     _, indices = torch.topk(logits, k=num_keep + 1, dim=1)  # Retrieve num_keep + 1 indices
@@ -312,6 +316,7 @@ def main(args):
     model_T = get_model(args, num_class=args.num_classes)
     train_loader, test_loader = fetch_dataloader(deepcopy(args))
     x_train_all, y_train_all = next(iter(train_loader)) #a, b =next(iter(test_loader))
+    # x_test_all, y_test_all = next(iter(test_loader)) #a, b =next(iter(test_loader))
     y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes).double()
     y_target_all = get_y_traget(x_train_all=x_train_all.to(args.device),
                                  model=model_T, 
