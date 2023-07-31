@@ -335,6 +335,7 @@ def main(args):
     x_train_all, y_train_all = next(iter(train_loader)) #a, b =next(iter(test_loader))
     x_test_all, y_test_all = next(iter(test_loader)) #a, b =next(iter(test_loader))
     y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes).double()
+    y_test_all = F.one_hot(y_test_all, num_classes=args.num_classes).double()
     # y_target_all = get_y_traget(x_train_all=x_train_all.to(args.device),
     #                              model=model_T, 
     #                              sparse_ratio=args.sparse_ratio,
@@ -381,9 +382,9 @@ def main(args):
 
         # Performance of clean and poisoned data
         _, y_pred1 = model_fn(kernel_fn=kernel_fn, x_train=_x_train, x_test=x_test_all, y_train=_y_train)
-        print("Clean Acc: {:.2f}".format(accuracy(y_pred1, y_test_all)))
+        print("Clean Acc: {:.4f}".format(accuracy(y_pred1, y_test_all)))
         _, y_pred2 = model_fn(kernel_fn=kernel_fn, x_train=x_train_adv[-1], x_test=x_test_all, y_train=y_train_adv[-1])
-        print("NTGA Robustness: {:.2f}".format(accuracy(y_pred2, y_test_all)))
+        print("NTGA Robustness: {:.4f}".format(accuracy(y_pred2, y_test_all)))
 
     # Save poisoned data
     x_train_adv = jnp.concatenate(x_train_adv)[:x_train_all.shape[0]]   #get pData with the same size of the original

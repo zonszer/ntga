@@ -49,7 +49,7 @@ python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t1024-uniform --fn_m
 
 python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t512-sp01_4W --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=1, --t=512 --nb_iter=20 --norm_type=np.inf --block_size=256 --seed=0 --T=4.0 --sparse_ratio=0.1 --step_size=1.1 --eps=0.03125 --batch_size=5120 --loss=KL	(TODO: test x_train=40000
 
-python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t512-NTGA_4W --fn_model_type=fnn --dataset=cifar10 --cuda_visible_devices=2, --t=512 --nb_iter=10 --norm_type=np.inf --block_size=512 --seed=0 --step_size=1.1 --eps=0.03125 --batch_size=30 	(TODO: test x_train=40000 with NTGA method
+python -utt generate_attack_NT.py --id=PdataST-eps03-iter20-t512-NTGA_4W --fn_model_type=fnn --dataset=cifar10 --cuda_visible_devices=1, --t=512 --nb_iter=10 --norm_type=np.inf --block_size=512 --seed=0 --step_size=1.1 --eps=0.03125 --batch_size=64 	(TODO: test x_train=40000 with NTGA method
 ===============Nasty teacher 
 
 python -utt generate_attack_NT.py --id=test_NT_Pdata-eps06 --fn_model_type=fnn --teacher_model_name=resnet18 --dataset=cifar10 --cuda_visible_devices=2, --t=4096 --nb_iter=40 --norm_type=np.inf --block_size=512 --seed=0 --T=4.0 --step_size=1.1 --eps=0.06
