@@ -78,8 +78,8 @@ def projected_gradient_descent(model_fn, kernel_fn, grads_fn, x_train, y_train, 
         adv_x = np.clip(adv_x, a_min=clip_min, a_max=clip_max)
         
     for i in range(nb_iter):    #10 iterations for 1 batch which composed of 520 images
-        adv_x = fast_gradient_method(model_fn, kernel_fn, grads_fn, x_train, y_train, x_test, y_test, t, loss, 
-                                     fx_train_0, fx_test_0, eps, norm, clip_min, clip_max, targeted, batch_size)
+        adv_x = fast_gradient_method(model_fn, kernel_fn, grads_fn, adv_x, y_train, x_test, y_test, t, loss, 
+                                     fx_train_0, fx_test_0, eps_iter, norm, clip_min, clip_max, targeted, batch_size)
 
         # Clipping perturbation eta to norm norm ball
         eta = adv_x - x
