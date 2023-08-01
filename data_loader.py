@@ -9,6 +9,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data import Dataset
+from PIL import Image
 
 
 class inv_transform(object):
@@ -34,13 +35,24 @@ class inv_transform(object):
     def __repr__(self):
         return self.__class__.__name__+'()'
 
+def generate_path_replace(input_path):
+    # Extract the directory and file name from the input path
+    directory = os.path.dirname(input_path)
+    filename = os.path.basename(input_path)
+    # Generate the output path by replacing "x_train" with "y_train" in the filename
+    output_filename = filename.replace("x_train", "y_train")
+    output_path = os.path.join(directory, output_filename)
+    return output_path
+
 class Cifar10Dataset(Dataset):
-    def __init__(self, x_path, y_path, transform=None):
+    def __init__(self, x_path, y_path=None, transform=None):
         super().__init__()
+        if y_path == None:
+            y_path = generate_path_replace(x_path)
         self.data = np.load(x_path)
         self.targets = np.load(y_path)
         # Convert to Tensor
-        self.data = torch.from_numpy(self.data).float()
+        self.data = torch.from_numpy(self.data)
         self.targets = torch.from_numpy(self.targets).long()
         self.transform = transform
 
@@ -55,8 +67,29 @@ class Cifar10Dataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+class Cifar10Dataset_img(Dataset):
+    def __init__(self, x_path, y_path=None, transform=None):
+        super().__init__()
+        if y_path == None:
+            y_path = generate_path_replace(x_path)
+        self.data = np.load(x_path)
+        self.targets = np.load(y_path)
+        self.transform = transform
 
-def fetch_dataloader(params):
+    def __getitem__(self, index):
+        img = self.data[index]
+        y = self.targets[index]
+        img = Image.fromarray(img)
+        if self.transform:
+            # Converts the data from numpy to torch tensor
+            img = self.transform(img)
+        return img, y
+
+    def __len__(self):
+        return len(self.data)
+
+
+def fetch_dataloader(mode='clean_data', params=None):
     """
     Fetch and return train/dev dataloader with hyperparameters (params.subset_percent = 1.)
     """
@@ -81,42 +114,53 @@ def fetch_dataloader(params):
     dev_transformer = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean, std)])
+    if mode == 'clean_data':
+        # ************************************************************************************
+        if params.dataset == 'cifar10':
+            trainset = torchvision.datasets.CIFAR10(root=CIFAR10_path,
+                                                    train=True,
+                                                    download=True, transform=train_transformer)
+            devset = torchvision.datasets.CIFAR10(root=CIFAR10_path, train=False,
+                                                download=True, transform=dev_transformer)
+        
+        # ************************************************************************************
+        elif params.dataset == 'cifar100':
+            trainset = torchvision.datasets.CIFAR100(root=CIFAR100_path, train=True,
+                                                    download=True, transform=train_transformer)
+            devset = torchvision.datasets.CIFAR100(root=CIFAR100_path,
+                                                train=False,
+                                                download=True, transform=dev_transformer)
 
-    # ************************************************************************************
-    if params.dataset == 'cifar10':
-        trainset = torchvision.datasets.CIFAR10(root=CIFAR10_path,
-                                                train=True,
-                                                download=True, transform=train_transformer)
-        devset = torchvision.datasets.CIFAR10(root=CIFAR10_path, train=False,
+        # ************************************************************************************
+        elif params.dataset == 'tiny_imagenet':
+            mean = [0.4802, 0.4481, 0.3975]
+            std = [0.2302, 0.2265, 0.2262]
+            data_dir = './data/tiny-imagenet-200/'
+            data_transforms = {
+                'train': transforms.Compose([
+                    transforms.RandomRotation(20),
+                    transforms.RandomHorizontalFlip(0.5),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean, std),
+                ]),
+                'val': transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean, std),
+                ])
+            }
+            train_dir = data_dir + 'train/'
+            test_dir = data_dir + 'val/'
+            trainset = torchvision.datasets.ImageFolder(train_dir, data_transforms['train'])
+            devset = torchvision.datasets.ImageFolder(test_dir, data_transforms['val'])
+    else:
+        assert mode == 'poison_data'
+        assert params.dataset == 'cifar10'
+        # train_transformer = transforms.Compose([
+        #     transforms.Normalize(mean, std)])
+        trainset = Cifar10Dataset_img(x_path=params.pData_path, transform=train_transformer)
+        devset = torchvision.datasets.CIFAR10(root=CIFAR10_path,
+                                              train=False,
                                               download=True, transform=dev_transformer)
-    # ************************************************************************************
-    elif params.dataset == 'cifar100':
-        trainset = torchvision.datasets.CIFAR100(root=CIFAR100_path, train=True,
-                                                download=True, transform=train_transformer)
-        devset = torchvision.datasets.CIFAR100(root=CIFAR100_path,
-                                               train=False,
-                                               download=True, transform=dev_transformer)
-    # ************************************************************************************
-    elif params.dataset == 'tiny_imagenet':
-        mean = [0.4802, 0.4481, 0.3975]
-        std = [0.2302, 0.2265, 0.2262]
-        data_dir = './data/tiny-imagenet-200/'
-        data_transforms = {
-            'train': transforms.Compose([
-                transforms.RandomRotation(20),
-                transforms.RandomHorizontalFlip(0.5),
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std),
-            ]),
-            'val': transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean, std),
-            ])
-        }
-        train_dir = data_dir + 'train/'
-        test_dir = data_dir + 'val/'
-        trainset = torchvision.datasets.ImageFolder(train_dir, data_transforms['train'])
-        devset = torchvision.datasets.ImageFolder(test_dir, data_transforms['val'])
 
     if hasattr(params, 'use_entire_dataset'):
         params.batch_size = len(trainset)

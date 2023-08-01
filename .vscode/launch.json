@@ -28,7 +28,7 @@
             "teacher_model_name=resnet18",
             "--dataset=cifar10",
             "--save_path=./data/",
-          "--cuda_visible_devices=1,",
+          "--cuda_visible_devices=0,",
           "--t=4096",
           "--nb_iter=20",
           "--eps=0.0315",
@@ -39,6 +39,37 @@
         "justMyCode": false,
         "console": "integratedTerminal",
         "env": {"PYTHONPATH": "${workspaceFolder}/libs/"}
+      },
+
+      {
+        "name": "generate_attack_NT-test_uniform.py",
+        "justMyCode": false,
+        "type": "python",
+        "request": "launch",
+        "python": "python",
+        "args": [
+          "--id=debug_PdataST-eps03-iter20-t1024-uniform",
+          "--fn_model_type=fnn",
+          "--teacher_model_name=resnet18",
+          "--dataset=cifar10",
+          "--cuda_visible_devices=1,2",
+          "--t=1024",
+          "--nb_iter=20",
+          "--norm_type=np.inf",
+          "--block_size=256",
+          "--seed=0",
+          "--T=4.0",
+          "--sparse_ratio=0.1",
+          "--step_size=1.1",
+          "--eps=0.03125",
+          "--batch_size=5120",
+          "--loss=KL"
+        ],
+        "program": "generate_attack_NT.py",
+        "console": "integratedTerminal",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/libs/"
+        }
       },
 
       {

@@ -310,11 +310,60 @@ def get_performance(epoch_idx, kernel_fn, x_train, y_train, x_remain, y_remain, 
     return loss, pred_clean, pred_adv
 
 
+def evaluate(model, eval_data, eval_labels):
+    model_path = 'resnet18_normal_clean4W.tar'
+    checkpoint = torch.load(model_path)
+    logger.log(logging.INFO, f'- Load pretrained NT/ST model from {model_path}')
+    try:
+        model.load_state_dict(checkpoint['state_dict'], strict=True)
+    except KeyError:
+        model.load_state_dict(checkpoint['model'], strict=True)
+
+    bs = 512
+    model.eval()
+    summ = []
+    if torch.cuda.is_available():
+        eval_data = eval_data.cuda()          # (B,3,32,32)
+        eval_labels = eval_labels.cuda()      # (B,)
+        model = model.cuda()
+    with torch.no_grad():
+        # compute metrics over the dataset
+        for i in range(int(eval_data.shape[0]//bs + 1)):
+            y_pred = model(eval_data[i*bs: (i+1)*bs])
+            y_true = eval_labels[i*bs: (i+1)*bs]
+
+            # compute model output
+            loss = nn.CrossEntropyLoss()(y_pred, y_true)
+            # # **************************please give the code for ploting nasty teacher logits distbution **************************
+            # plot_logitsDistri(output_batch, labels_batch)
+            # vis_featureMaps(t_model, train_batch, labels_batch)
+
+            # extract data from torch Variable, move to cpu, convert to numpy arrays
+            y_pred = y_pred.cpu().numpy()
+            y_true = y_true.cpu().numpy()
+            # calculate accuracy
+            y_pred = np.argmax(y_pred, axis=1)
+            acc = 100.0 * np.sum(y_pred == y_true) / float(y_true.shape[0])
+
+            summary_batch = {'acc': acc, 'loss': loss.item()}
+            summ.append(summary_batch)
+
+    # compute mean of all metrics in summary
+    metrics_mean = {metric: np.mean([x[metric] for x in summ]) for metric in summ[0]}
+    return metrics_mean
+
 def main(args):
-    # Load training and test data
-    # data = ld_cifar10()
+    # # #---statrt changed here:
+    # model = get_model(args, num_class=args.num_classes)
+    # args.pData_path = '/media/zjh/本地磁盘/projects7.12/ntga/data/cifar10/x_train_cifar10_ntga_fnn_id-PdataST-eps03-iter20-sp01sec.npy'
+    # train_loader, test_loader = fetch_dataloader(mode='poison_data', params=deepcopy(args))
+    # x_train_all, y_train_all = next(iter(train_loader)) #a, b =next(iter(test_loader))
+    # x_train_all1, y_train_all1 = x_train_all[10000:20000], y_train_all[10000:20000]
+    # summary = evaluate(model, x_train_all1, y_train_all1)
+    # # #---end changed here:
+
     model_T = get_model(args, num_class=args.num_classes)
-    train_loader, test_loader = fetch_dataloader(deepcopy(args))
+    train_loader, test_loader = fetch_dataloader(mode='clean_data', params=deepcopy(args))
     x_train_all, y_train_all = next(iter(train_loader)) #a, b =next(iter(test_loader))
     # x_test_all, y_test_all = next(iter(test_loader)) #a, b =next(iter(test_loader))
     y_train_all = F.one_hot(y_train_all, num_classes=args.num_classes).double()
@@ -323,11 +372,12 @@ def main(args):
                                  sparse_ratio=args.sparse_ratio,
                                  id=args.id) 
     x_train_all = train_loader.dataset.invtransformer(x_train_all)
+    x_val_all, y_val_all = x_train_all[40000:50000], y_train_all[40000:50000]
+    x_train_all, y_train_all = x_train_all[:40000], y_train_all[:40000]
     torch.cuda.empty_cache()
 
     y_target_all = jnp.array(y_target_all)  # shape=(50000, 10)
     x_train_all, y_train_all = _flatten(jnp.array(x_train_all)), jnp.array(y_train_all)
-    x_target_all = None
 
     logger.log(logging.INFO, "Building model...")
     key = random.PRNGKey(args.seed)
@@ -335,9 +385,6 @@ def main(args):
     init_fn, apply_fn, kernel_fn = surrogate_fn(args.fn_model_type, W_std, b_std, args.num_classes, args.dataset)
     apply_fn = jit(apply_fn)
     kernel_fn = jit(kernel_fn, static_argnums=(2,)) #static_argnums is kernel_fn(x1, x2, 'nngp')
-    
-    # grads_fn: a callable that takes an input tensor and a loss function, 
-    # and returns the gradient w.r.t. an input tensor.
     grads_fn = jit(grad(NT_loss, argnums=0), static_argnums=(5, 6, 8))
     
     # Generate Neural Tangent Generalization Attacks (NTGA)
