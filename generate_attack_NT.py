@@ -143,7 +143,7 @@ def NT_loss(x_train, y_train, x_remain, y_remain, x_train_target, kernel_fn,
             loss=None, t=None, T=None, w=0.2, targeted=True, diag_reg=1e-4):
     # Kernel
     # ntk_train_train = kernel_fn(x_train, x_train, 'ntk')    #out shape:(512, 512)
-    ntk_remain_remain = kernel_fn(x_remain, x_remain, 'ntk')    #out shape:(512, 512)
+    ntk_remain_remain = kernel_fn(x_remain, x_remain, 'ntk')    #out shape:(512, 512)   #x_remain也必须是poi data才行
     ntk_train_remain = kernel_fn(x_train, x_remain, 'ntk')      #shape=(30, 512)  #changed 1:
     
     # Prediction    #why not use gradient_descent_mse_ensemble?
