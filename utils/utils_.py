@@ -21,6 +21,7 @@ def restore_pic(x):
         numpy array : The restored image. Shape is (H x W x C) and values are in range [0,255]
     """
     x = x * 255
+    x = x.clamp_(0, 255)
     x = jnp.round(x)
     x = x.astype(jnp.uint8)
     x = jnp.transpose(x, (0, 2, 3, 1))
